@@ -3,6 +3,12 @@ RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)
 NC=$(tput sgr0) # No Color
 
+  if [ "$1" != "" ]; then
+    ssh_port="$1"
+  else
+    ssh_port=22
+  fi
+
   # Basic software
   echo ""
   echo ""
@@ -29,11 +35,11 @@ NC=$(tput sgr0) # No Color
   echo ""
   echo "Setting Ubuntu Firewall permissions."
   echo ""
-  echo "Allowing TCP ports: 80, 443, 55555, 43594-43599"
+  echo "Allowing TCP ports: 80, 443, the ssh port, 43594-43599"
   echo "Denying TCP port 3306 (MySQL)"
   sleep 5
   echo ""
-  sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw allow 55555/tcp && sudo ufw allow 43594/tcp && sudo ufw allow 43595/tcp && sudo ufw allow 43596/tcp && sudo ufw allow 43597/tcp && sudo ufw allow 43598/tcp && sudo ufw allow 43599/tcp && sudo ufw deny 3306/tcp
+  sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw allow "$ssh_port"/tcp && sudo ufw allow 43594/tcp && sudo ufw allow 43595/tcp && sudo ufw allow 43596/tcp && sudo ufw allow 43597/tcp && sudo ufw allow 43598/tcp && sudo ufw allow 43599/tcp && sudo ufw deny 3306/tcp
   sudo sed -i 's/DEFAULT_FORWARD_POLICY="DENY"/DEFAULT_FORWARD_POLICY="ACCEPT"/g' /etc/default/ufw
   sudo ufw reload
   sudo ufw --force enable
@@ -41,26 +47,14 @@ NC=$(tput sgr0) # No Color
   # Configures and secures SSH access
   echo ""
   echo "Hardening the SSH configuration against adversary activity."
-  echo "Note: this is changing SSH port from default 22 to 55555."
+  echo "Note: this is changing SSH port from default 22 to $ssh_port."
   sleep 5
   echo ""
   sudo sed -i 's/#ClientAliveInterval 0/ClientAliveInterval 300/g' /etc/ssh/sshd_config
   sudo sed -i 's/#ClientAliveCountMax 3/ClientAliveCountMax 2/g' /etc/ssh/sshd_config
   sudo sed -i 's/#MaxAuthTries/MaxAuthTries/g' /etc/ssh/sshd_config
   sudo sed -i 's/X11Forwarding yes/X11Forwarding no/g' /etc/ssh/sshd_config
-  sudo sed -i 's/#Port 22/Port 55555/g' /etc/ssh/sshd_config
-
-  echo ""
-  echo "It is time to create a new user, other than root, if one has not been created already."
-  echo "Please state a username that should have SSH sudo access. To skip, type 'skip' and press enter."
-  echo ""
-  read -r user
-  if [ "$user" == "skip" ]; then
-    echo "Skipping..."
-  elif [ "$compiling" != "skip" ]; then
-    sudo useradd $user
-    sudo usermod -aG sudo $user
-  fi
+  sudo sed -i "s/#Port 22/Port $ssh_port/g" /etc/ssh/sshd_config
 
   #echo ""
   #echo ""
@@ -95,18 +89,5 @@ NC=$(tput sgr0) # No Color
   filter    = sshd' | sudo tee /etc/fail2ban/jail.local
   sudo systemctl enable fail2ban
   sudo systemctl restart fail2ban
-
-  # Configures Google Authenticator MFA for SSH
-  echo ""
-  echo "Installing Google authenticator multifactor authentication for SSH"
-  echo ""
-  sleep 3
-  sudo apt install libpam-google-authenticator -y
-  echo ""
-  echo "Starting Google authenticator MFA set up. You will need a smartphone for the QR code."
-  echo "It is most secure to answer y to each prompt."
-  echo ""
-  google-authenticator
-  sudo echo -e "auth required pam_google_authenticator.so" | sudo tee -a /etc/pam.d/sshd
 
   make docker-install

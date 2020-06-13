@@ -12,7 +12,7 @@ run-client:
 	ant -f Client_Base/build.xml runclient
 
 combined-install:
-	`pwd`/Deployment_Scripts/combined-install.sh
+	`pwd`/Deployment_Scripts/combined-install.sh ${SSH_PORT}
 
 docker-install:
 	`pwd`/Deployment_Scripts/docker-install.sh
