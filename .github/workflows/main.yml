@@ -1,16 +1,10 @@
-# This is a basic workflow to help you get started with Actions
-
 name: ChocolateRSC CI
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
     runs-on: ubuntu-latest
 
@@ -30,14 +24,12 @@ jobs:
       run: ant -f Client_Base/build.xml compile
     - uses: actions/upload-artifact@v2
       with:
+        name: Client
         path: Client_Base/*.jar
-    - uses: actions/upload-artifact@v2
-      with:
-        name: Cache
-        path: Client_Base/Cache
-      
+        
     - name: Build Client Launcher
       run: ant -f PC_Launcher/build.xml compile
     - uses: actions/upload-artifact@v2
       with:
+        name: Client
         path: PC_Launcher/*.jar
