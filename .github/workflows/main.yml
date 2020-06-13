@@ -33,6 +33,9 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         path: Client_Base/*.jar
+    - uses: actions/upload-artifact@v2
+      with:
+        path: Client_Base/Cache/
       
     - name: Build Client Launcher
       run: ant -f PC_Launcher/build.xml compile
