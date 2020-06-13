@@ -7,8 +7,6 @@ name: ChocolateRSC CI
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -35,6 +33,7 @@ jobs:
         path: Client_Base/*.jar
     - uses: actions/upload-artifact@v2
       with:
+        name: Cache
         path: Client_Base/Cache
       
     - name: Build Client Launcher
