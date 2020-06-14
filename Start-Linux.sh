@@ -11,7 +11,7 @@ Striving for a replica RSC game and more.
 What would you like to do?
 
 Choices:
-  ${RED}1${NC} - Install
+  ${RED}1${NC} - Initial Install
   ${RED}2${NC} - Update and compile code
   ${RED}3${NC} - Run game server
   ${RED}4${NC} - Run game client
