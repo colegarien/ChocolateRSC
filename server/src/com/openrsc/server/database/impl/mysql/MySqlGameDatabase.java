@@ -77,9 +77,9 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected void executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
 		try {
 			final PreparedStatement statement = getConnection().prepareStatement(query);
-			var parameterIndex = 1;
-			for (var i = 1; i <= parameters.length; i++) {
-				var parameter = parameters[i - 1];
+			int parameterIndex = 1;
+			for (int i = 1; i <= parameters.length; i++) {
+				Object parameter = parameters[i - 1];
 				if (parameter instanceof Integer) {
 					statement.setInt(parameterIndex, (Integer) parameter);
 				} else if (parameter instanceof Long) {
@@ -89,17 +89,17 @@ public class MySqlGameDatabase extends GameDatabase {
 				} else if (parameter instanceof String) {
 					statement.setString(parameterIndex, (String) parameter);
 				} else if (parameter instanceof Object[]) {
-					var array = (Object[]) parameter;
+					Object[] array = (Object[]) parameter;
 					for (int j = 0; j < array.length; j++) {
 						// TODO this is a bit rough... and redundant; needs some DRYing up
-						var innerParameter = array[j];
-						if (parameter instanceof Integer) {
+						Object innerParameter = array[j];
+						if (innerParameter instanceof Integer) {
 							statement.setInt(parameterIndex, (Integer) innerParameter);
-						} else if (parameter instanceof Long) {
+						} else if (innerParameter instanceof Long) {
 							statement.setLong(parameterIndex, (Long) innerParameter);
-						} else if (parameter instanceof Boolean) {
+						} else if (innerParameter instanceof Boolean) {
 							statement.setBoolean(parameterIndex, (Boolean) innerParameter);
-						} else if (parameter instanceof String) {
+						} else if (innerParameter instanceof String) {
 							statement.setString(parameterIndex, (String) innerParameter);
 						} else {
 							throw new GameDatabaseException(this, "Unknown Inner Parameter(" + parameterIndex + ") Type \"" + innerParameter.getClass().getName() + "\"");
@@ -916,9 +916,8 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected PlayerRecoveryQuestions queryPlayerRecoveryData(int playerId, String tableName) throws GameDatabaseException {
 		try {
 			PlayerRecoveryQuestions recoveryQuestions = new PlayerRecoveryQuestions();
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerRecoveryInfo);
-			statement.setString(1, tableName);
-			statement.setInt(2, playerId);
+			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerRecoveryInfo.replace(getQueries().TABLENAME_PLACEHOLDER, tableName));
+			statement.setInt(1, playerId);
 			final ResultSet resultSet = statement.executeQuery();
 
 			try {
@@ -934,8 +933,10 @@ public class MySqlGameDatabase extends GameDatabase {
 					}
 					recoveryQuestions.dateSet = resultSet.getInt("date_set");
 					recoveryQuestions.ipSet = resultSet.getString("ip_set");
-					recoveryQuestions.previousPass = resultSet.getString("previous_pass");
-					recoveryQuestions.earlierPass = resultSet.getString("earlier_pass");
+					if(tableName.equals("player_recovery")) {
+						recoveryQuestions.previousPass = resultSet.getString("previous_pass");
+						recoveryQuestions.earlierPass = resultSet.getString("earlier_pass");
+					}
 
 					return recoveryQuestions;
 				}
@@ -951,8 +952,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryInsertPlayerRecoveryData(int playerId, PlayerRecoveryQuestions recoveryQuestions, String tableName) throws GameDatabaseException {
-		executeUpdateQuery(getQueries().newPlayerRecoveryInfo,
-			tableName,
+		executeUpdateQuery(getQueries().newPlayerRecoveryInfo.replace(getQueries().TABLENAME_PLACEHOLDER, tableName),
 			playerId,
 			recoveryQuestions.username,
 			recoveryQuestions.question1,
@@ -968,7 +968,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryInsertRecoveryAttempt(int playerId, String username, long time, String ip) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerRecoveryAttempt, new String[]{"dbid"});
+			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerRecoveryAttempt, Statement.RETURN_GENERATED_KEYS);
 			statement.setInt(1, playerId);
 			statement.setString(2, username);
 			statement.setLong(3, time);
@@ -1353,7 +1353,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySavePlayerData(int playerId, PlayerData playerData) throws GameDatabaseException {
-		var parameterList = new ArrayList<Object>();
+		ArrayList<Object> parameterList = new ArrayList<Object>();
 		parameterList.addAll(Arrays.asList(
 			playerData.combatLevel,
 			playerData.totalLevel,
@@ -1448,7 +1448,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected void querySavePlayerEquipped(int playerId, PlayerEquipped[] equipment) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteEquip, playerId);
+			executeUpdateQuery(getQueries().save_DeleteEquip, playerId);
 			PreparedStatement statement = getConnection().prepareStatement(getQueries().save_EquipmentAdd);
 			PreparedStatement statement2 = getConnection().prepareStatement(getQueries().save_ItemCreate);
 			for (PlayerEquipped item : equipment) {
@@ -1480,7 +1480,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected void querySavePlayerBank(int playerId, PlayerBank[] bank) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteBank, playerId);
+			executeUpdateQuery(getQueries().save_DeleteBank, playerId);
 			if (bank.length > 0) {
 				PreparedStatement statement = getConnection().prepareStatement(getQueries().save_BankAdd);
 				PreparedStatement statement2 = getConnection().prepareStatement(getQueries().save_ItemCreate);
@@ -1552,7 +1552,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected void querySavePlayerFriends(int playerId, PlayerFriend[] friends) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteFriends, playerId);
+			executeUpdateQuery(getQueries().save_DeleteFriends, playerId);
 			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddFriends);
 			for (final PlayerFriend friend : friends) {
 				String username = DataConversions.hashToUsername(friend.playerHash);
@@ -1577,7 +1577,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected void querySavePlayerIgnored(int playerId, PlayerIgnore[] ignoreList) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteIgnored, playerId);
+			executeUpdateQuery(getQueries().save_DeleteIgnored, playerId);
 			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddIgnored);
 			for (final PlayerIgnore ignored : ignoreList) {
 				statement.setInt(1, playerId);
@@ -1598,7 +1598,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected void querySavePlayerQuests(int playerId, PlayerQuest[] quests) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteQuests, playerId);
+			executeUpdateQuery(getQueries().save_DeleteQuests, playerId);
 			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddQuest);
 			for (final PlayerQuest quest : quests) {
 				statement.setInt(1, playerId);
@@ -1625,7 +1625,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected void querySavePlayerCache(int playerId, PlayerCache[] cache) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteCache, playerId);
+			executeUpdateQuery(getQueries().save_DeleteCache, playerId);
 			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddCache);
 			for (final PlayerCache cacheKey : cache) {
 				statement.setInt(1, playerId);
@@ -1696,26 +1696,26 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySavePlayerSkills(int playerId, PlayerSkills[] currSkillLevels) throws GameDatabaseException {
-		var parameterList = new ArrayList<Object>();
+		ArrayList<Object> parameterList = new ArrayList<Object>();
 		Arrays.sort(currSkillLevels, Comparator.comparingInt(s -> s.skillId));
 		for (PlayerSkills skill : currSkillLevels) {
 			parameterList.add(skill.skillCurLevel);
 		}
 		parameterList.add(playerId);
 
-		executeUpdateQuery(getQueries().updateStats, parameterList);
+		executeUpdateQuery(getQueries().updateStats, parameterList.toArray());
 	}
 
 	@Override
 	protected void querySavePlayerExperience(int playerId, PlayerExperience[] experience) throws GameDatabaseException {
-		var parameterList = new ArrayList<Object>();
+		ArrayList<Object> parameterList = new ArrayList<Object>();
 		Arrays.sort(experience, Comparator.comparingInt(s -> s.skillId));
 		for (PlayerExperience exp : experience) {
 			parameterList.add(exp.experience);
 		}
 		parameterList.add(playerId);
 
-		executeUpdateQuery(getQueries().updateExperience, parameterList);
+		executeUpdateQuery(getQueries().updateExperience, parameterList.toArray());
 	}
 
 	@Override
@@ -1742,7 +1742,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryItemCreate(Item item) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_ItemCreate, 1);
+			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_ItemCreate, Statement.RETURN_GENERATED_KEYS);
 			try {
 				statement.setInt(1, item.getCatalogId());
 				statement.setInt(2, item.getItemStatus().getAmount());
@@ -2109,10 +2109,6 @@ public class MySqlGameDatabase extends GameDatabase {
 		}
 
 		return prepared;
-	}
-
-	private void updateLongs(String statement, int... intA) throws GameDatabaseException {
-		executeUpdateQuery(statement, intA);
 	}
 
 	private List<Long> longListFromResultSet(ResultSet result, String param) throws SQLException {

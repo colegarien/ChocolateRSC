@@ -5,6 +5,7 @@ import com.openrsc.server.external.SkillDef;
 
 public class MySqlQueries {
 	public final String PREFIX;
+	public final String TABLENAME_PLACEHOLDER;
 
 	public String updateExperience, updateStats, playerExp, playerCurExp;
 	public final String createPlayer, recentlyRegistered, initStats, initExp;
@@ -35,6 +36,7 @@ public class MySqlQueries {
 	public MySqlQueries(final Server server) {
 		this.server = server;
 		PREFIX = getServer().getConfig().DB_TABLE_PREFIX;
+		TABLENAME_PLACEHOLDER = "$table_name$";
 
 		updateExperience = "UPDATE `" + PREFIX + "experience` SET ";
 		updateStats = "UPDATE `" + PREFIX + "curstats` SET ";
@@ -125,8 +127,8 @@ public class MySqlQueries {
 		playerPendingRecovery = "SELECT `username`, `question1`, `answer1`, `question2`, `answer2`, " +
 			"`question3`, `answer3`, `question4`, `answer4`, `question5`, `answer5`, `date_set`, " +
 			"`ip_set` FROM `" + PREFIX + "player_change_recovery` WHERE `playerID`=?";
-		playerRecoveryInfo = "SELECT * FROM `" + PREFIX + "?` WHERE playerID=?";
-		newPlayerRecoveryInfo = "INSERT INTO `" + PREFIX + "?` (`playerID`, `username`, `question1`, `question2`, `question3`, `question4`, `question5`, `answer1`, `answer2`, `answer3`, `answer4`, `answer5`, `date_set`, `ip_set`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		playerRecoveryInfo = "SELECT * FROM `" + PREFIX + TABLENAME_PLACEHOLDER + "` WHERE playerID=?";
+		newPlayerRecoveryInfo = "INSERT INTO `" + PREFIX + TABLENAME_PLACEHOLDER + "` (`playerID`, `username`, `question1`, `question2`, `question3`, `question4`, `question5`, `answer1`, `answer2`, `answer3`, `answer4`, `answer5`, `date_set`, `ip_set`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		playerRecoveryAttempt = "INSERT INTO `" + PREFIX + "recovery_attempts`(`playerID`, `username`, `time`, `ip`) VALUES(?, ?, ?, ?)";
 		playerLastRecoveryTryId = "UPDATE `" + PREFIX + "players` SET `lastRecoveryTryId`=? WHERE `id`=?";
 		cancelRecoveryChangeRequest = "DELETE FROM `" + PREFIX + "player_change_recovery` WHERE `playerID`=?";
