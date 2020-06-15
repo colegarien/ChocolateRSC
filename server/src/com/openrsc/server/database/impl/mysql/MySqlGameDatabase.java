@@ -71,8 +71,57 @@ public class MySqlGameDatabase extends GameDatabase {
 	}
 
 	public void initializeOnlinePlayers() throws GameDatabaseException {
+		executeUpdateQuery(getQueries().initializeOnlineUsers);
+	}
+
+	protected void executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
 		try {
-			getConnection().executeUpdate(getQueries().initializeOnlineUsers);
+			final PreparedStatement statement = getConnection().prepareStatement(query);
+			var parameterIndex = 1;
+			for (var i = 1; i <= parameters.length; i++) {
+				var parameter = parameters[i - 1];
+				if (parameter instanceof Integer) {
+					statement.setInt(parameterIndex, (Integer) parameter);
+				} else if (parameter instanceof Long) {
+					statement.setLong(parameterIndex, (Long) parameter);
+				} else if (parameter instanceof Boolean) {
+					statement.setBoolean(parameterIndex, (Boolean) parameter);
+				} else if (parameter instanceof String) {
+					statement.setString(parameterIndex, (String) parameter);
+				} else if (parameter instanceof Object[]) {
+					var array = (Object[]) parameter;
+					for (int j = 0; j < array.length; j++) {
+						// TODO this is a bit rough... and redundant; needs some DRYing up
+						var innerParameter = array[j];
+						if (parameter instanceof Integer) {
+							statement.setInt(parameterIndex, (Integer) innerParameter);
+						} else if (parameter instanceof Long) {
+							statement.setLong(parameterIndex, (Long) innerParameter);
+						} else if (parameter instanceof Boolean) {
+							statement.setBoolean(parameterIndex, (Boolean) innerParameter);
+						} else if (parameter instanceof String) {
+							statement.setString(parameterIndex, (String) innerParameter);
+						} else {
+							throw new GameDatabaseException(this, "Unknown Inner Parameter(" + parameterIndex + ") Type \"" + innerParameter.getClass().getName() + "\"");
+						}
+
+						if (j != array.length - 1) {
+							parameterIndex++;
+						}
+					}
+
+				} else {
+					throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
+				}
+
+				parameterIndex++;
+			}
+
+			try {
+				statement.executeUpdate();
+			} finally {
+				statement.close();
+			}
 		} catch (final SQLException ex) {
 			// Convert SQLException to a general usage exception
 			throw new GameDatabaseException(this, ex.getMessage());
@@ -149,40 +198,20 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected String queryBanPlayer(String userNameToBan, Player bannedBy, long bannedForMinutes) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement;
-			final String replyMessage;
+		final String replyMessage;
 
-			if (bannedForMinutes == -1) {
-				statement = getConnection().prepareStatement(getQueries().banPlayer);
-				statement.setLong(1, bannedForMinutes);
-				statement.setString(2, userNameToBan);
-
-				replyMessage = userNameToBan + " has been banned permanently";
-			} else if (bannedForMinutes == 0) {
-				statement = getConnection().prepareStatement(getQueries().unbanPlayer);
-				statement.setString(1, userNameToBan);
-
-				replyMessage = userNameToBan + " has been unbanned.";
-			} else {
-				statement = getConnection().prepareStatement(getQueries().banPlayer);
-				statement.setLong(1, (System.currentTimeMillis() + (bannedForMinutes * 60000)));
-				statement.setString(2, userNameToBan);
-
-				replyMessage = userNameToBan + " has been banned for " + bannedForMinutes + " minutes";
-			}
-
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-
-			return replyMessage;
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		if (bannedForMinutes == -1) {
+			executeUpdateQuery(getQueries().banPlayer, bannedForMinutes, userNameToBan);
+			replyMessage = userNameToBan + " has been banned permanently";
+		} else if (bannedForMinutes == 0) {
+			executeUpdateQuery(getQueries().unbanPlayer, userNameToBan);
+			replyMessage = userNameToBan + " has been unbanned.";
+		} else {
+			executeUpdateQuery(getQueries().banPlayer, (System.currentTimeMillis() + (bannedForMinutes * 60000)), userNameToBan);
+			replyMessage = userNameToBan + " has been banned for " + bannedForMinutes + " minutes";
 		}
+
+		return replyMessage;
 	}
 
 	@Override
@@ -289,21 +318,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryAddDropLog(ItemDrop drop) throws GameDatabaseException {
-		try {
-			final PreparedStatement statementInsert = getConnection().prepareStatement(getQueries().dropLogInsert);
-			statementInsert.setInt(1, drop.itemId);
-			statementInsert.setInt(2, drop.playerId);
-			statementInsert.setInt(3, drop.amount);
-			statementInsert.setInt(4, drop.npcId);
-			try {
-				statementInsert.executeUpdate();
-			} finally {
-				statementInsert.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().dropLogInsert, drop.itemId, drop.playerId, drop.amount, drop.npcId);
 	}
 
 	@Override
@@ -339,23 +354,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryCreatePlayer(String username, String email, String password, long creationDate, String ip) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().createPlayer);
-			statement.setString(1, username);
-			statement.setString(2, email);
-			statement.setString(3, password);
-			statement.setLong(4, System.currentTimeMillis() / 1000);
-			statement.setString(5, ip);
-
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().createPlayer, username, email, password, System.currentTimeMillis() / 1000, ip);
 	}
 
 	@Override
@@ -383,32 +382,12 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryInitializeStats(int playerId) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().initStats);
-			statement.setInt(1, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().initStats, playerId);
 	}
 
 	@Override
 	protected void queryInitializeExp(int playerId) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().initExp);
-			statement.setInt(1, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().initExp, playerId);
 	}
 
 	@Override
@@ -972,29 +951,18 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryInsertPlayerRecoveryData(int playerId, PlayerRecoveryQuestions recoveryQuestions, String tableName) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().newPlayerRecoveryInfo);
-			statement.setString(1, tableName);
-			statement.setInt(2, playerId);
-			statement.setString(3, recoveryQuestions.username);
-			statement.setString(4, recoveryQuestions.question1);
-			statement.setString(5, recoveryQuestions.question2);
-			statement.setString(6, recoveryQuestions.question3);
-			statement.setString(7, recoveryQuestions.question4);
-			statement.setString(8, recoveryQuestions.question5);
-			for (int i = 0; i < recoveryQuestions.answers.length; i++) {
-				statement.setString(i + 9, recoveryQuestions.answers[i]);
-			}
-			statement.setLong(14, recoveryQuestions.dateSet);
-			statement.setString(15, recoveryQuestions.ipSet);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().newPlayerRecoveryInfo,
+			tableName,
+			playerId,
+			recoveryQuestions.username,
+			recoveryQuestions.question1,
+			recoveryQuestions.question2,
+			recoveryQuestions.question3,
+			recoveryQuestions.question4,
+			recoveryQuestions.question5,
+			recoveryQuestions.answers,
+			recoveryQuestions.dateSet,
+			recoveryQuestions.ipSet);
 	}
 
 	@Override
@@ -1023,17 +991,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryCancelRecoveryChange(int playerId) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().cancelRecoveryChangeRequest);
-			statement.setInt(1, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().cancelRecoveryChangeRequest, playerId);
 	}
 
 	@Override
@@ -1068,45 +1026,12 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryInsertContactDetails(int playerId, PlayerContactDetails contactDetails) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().newContactDetails);
-			statement.setInt(1, playerId);
-			statement.setString(2, contactDetails.username);
-			statement.setString(3, contactDetails.fullName);
-			statement.setString(4, contactDetails.zipCode);
-			statement.setString(5, contactDetails.country);
-			statement.setString(6, contactDetails.email);
-			statement.setLong(7, contactDetails.dateModified);
-			statement.setString(8, contactDetails.ip);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().newContactDetails, playerId, contactDetails.username, contactDetails.fullName, contactDetails.zipCode, contactDetails.country, contactDetails.email, contactDetails.dateModified, contactDetails.ip);
 	}
 
 	@Override
 	protected void queryUpdateContactDetails(int playerId, PlayerContactDetails contactDetails) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateContactDetails);
-			statement.setString(1, contactDetails.fullName);
-			statement.setString(2, contactDetails.zipCode);
-			statement.setString(3, contactDetails.country);
-			statement.setString(4, contactDetails.email);
-			statement.setLong(5, contactDetails.dateModified);
-			statement.setString(6, contactDetails.ip);
-			statement.setInt(7, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().updateContactDetails, contactDetails.fullName, contactDetails.zipCode, contactDetails.country, contactDetails.email, contactDetails.dateModified, contactDetails.ip, playerId);
 	}
 
 	@Override
@@ -1219,72 +1144,22 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryDeleteClan(int clanId) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().deleteClan);
-			statement.setInt(1, clanId);
-
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().deleteClan, clanId);
 	}
 
 	@Override
 	protected void queryDeleteClanMembers(int clanId) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().deleteClanMembers);
-			statement.setInt(1, clanId);
-
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().deleteClanMembers, clanId);
 	}
 
 	@Override
 	protected void queryUpdateClan(ClanDef clan) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateClan);
-			statement.setString(1, clan.name);
-			statement.setString(2, clan.tag);
-			statement.setString(3, clan.leader);
-			statement.setInt(4, clan.kick_setting);
-			statement.setInt(5, clan.invite_setting);
-			statement.setInt(6, clan.allow_search_join);
-			statement.setInt(7, clan.clan_points);
-			statement.setInt(8, clan.id);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException e) {
-			throw new GameDatabaseException(this, e.getMessage());
-		}
+		executeUpdateQuery(getQueries().updateClan, clan.name, clan.tag, clan.leader, clan.kick_setting, clan.invite_setting, clan.allow_search_join, clan.clan_points, clan.id);
 	}
 
 	@Override
 	protected void queryUpdateClanMember(ClanMember clanMember) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateClanMember);
-			statement.setInt(1, clanMember.rank);
-			statement.setString(2, clanMember.username);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException e) {
-			throw new GameDatabaseException(this, e.getMessage());
-		}
+		executeUpdateQuery(getQueries().updateClanMember, clanMember.rank, clanMember.username);
 	}
 
 	@Override
@@ -1353,36 +1228,12 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryNewAuction(AuctionItem auctionItem) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().newAuction);
-			statement.setInt(1, auctionItem.itemID);
-			statement.setInt(2, auctionItem.amount);
-			statement.setInt(3, auctionItem.amount_left);
-			statement.setInt(4, auctionItem.price);
-			statement.setInt(5, auctionItem.seller);
-			statement.setString(6, auctionItem.seller_username);
-			statement.setString(7, auctionItem.buyer_info);
-			statement.setLong(8, auctionItem.time);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().newAuction, auctionItem.itemID, auctionItem.amount, auctionItem.amount_left, auctionItem.price, auctionItem.seller, auctionItem.seller_username, auctionItem.buyer_info, auctionItem.time);
 	}
 
 	@Override
 	protected void queryCancelAuction(final int auctionId) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().cancelAuction);
-			statement.setInt(1, auctionId);
-			try{statement.executeUpdate();}
-			finally{statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().cancelAuction, auctionId);
 	}
 
 	@Override
@@ -1492,138 +1343,79 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySetSoldOut(final AuctionItem auctionItem) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().auctionSellOut);
-			statement.setInt(1, auctionItem.amount_left);
-			statement.setInt(2, auctionItem.sold_out);
-			statement.setString(3, auctionItem.buyer_info);
-			statement.setInt(4, auctionItem.auctionID);
-			try {statement.executeUpdate();}
-			finally {statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().auctionSellOut, auctionItem.amount_left, auctionItem.sold_out, auctionItem.buyer_info, auctionItem.auctionID);
 	}
 
 	@Override
 	protected void queryUpdateAuction(final AuctionItem auctionItem) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateAuction);
-			statement.setInt(1, auctionItem.amount_left);
-			statement.setInt(2, auctionItem.price);
-			statement.setString(3, auctionItem.buyer_info);
-			statement.setInt(4, auctionItem.auctionID);
-			try{statement.executeUpdate();}
-			finally{statement.close();}
-		} catch (final SQLException e) {
-			throw new GameDatabaseException(this, e.getMessage());
-		}
+		executeUpdateQuery(getQueries().updateAuction, auctionItem.amount_left, auctionItem.price, auctionItem.buyer_info, auctionItem.auctionID);
 	}
 
 	@Override
 	protected void querySavePlayerData(int playerId, PlayerData playerData) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_UpdateBasicInfo);
-			int counter = 1;
-			statement.setInt(counter++, playerData.combatLevel);
-			statement.setInt(counter++, playerData.totalLevel);
-			statement.setInt(counter++, playerData.xLocation);
-			statement.setInt(counter++, playerData.yLocation);
-			statement.setInt(counter++, playerData.fatigue);
-			statement.setInt(counter++, playerData.kills);
-			statement.setInt(counter++, playerData.deaths);
-			statement.setInt(counter++, playerData.npcKills);
-			if (getServer().getConfig().SPAWN_IRON_MAN_NPCS) {
-				statement.setInt(counter++, playerData.ironMan);
-				statement.setInt(counter++, playerData.ironManRestriction);
-				statement.setInt(counter++, playerData.hcIronManDeath);
-			}
-			statement.setInt(counter++, playerData.questPoints);
-			statement.setInt(counter++, playerData.hairColour);
-			statement.setInt(counter++, playerData.topColour);
-			statement.setInt(counter++, playerData.trouserColour);
-			statement.setInt(counter++, playerData.skinColour);
-			statement.setInt(counter++, playerData.headSprite);
-			statement.setInt(counter++, playerData.bodySprite);
-			statement.setInt(counter++, playerData.male ? 1 : 0);
-			statement.setInt(counter++, playerData.combatStyle);
-			statement.setLong(counter++, playerData.muteExpires);
-			statement.setInt(counter++, playerData.bankSize);
-			statement.setInt(counter++, playerData.groupId);
-			statement.setInt(counter++, playerData.blockChat ? 1 : 0);
-			statement.setInt(counter++, playerData.blockPrivate ? 1 : 0);
-			statement.setInt(counter++, playerData.blockTrade ? 1 : 0);
-			statement.setInt(counter++, playerData.blockDuel ? 1 : 0);
-			statement.setInt(counter++, playerData.cameraAuto ? 1 : 0);
-			statement.setInt(counter++, playerData.oneMouse ? 1 : 0);
-			statement.setInt(counter++, playerData.soundOff ? 1 : 0);
-			statement.setInt(counter++, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		var parameterList = new ArrayList<Object>();
+		parameterList.addAll(Arrays.asList(
+			playerData.combatLevel,
+			playerData.totalLevel,
+			playerData.xLocation,
+			playerData.yLocation,
+			playerData.fatigue,
+			playerData.kills,
+			playerData.deaths,
+			playerData.npcKills
+		));
+		if (getServer().getConfig().SPAWN_IRON_MAN_NPCS) {
+			parameterList.addAll(Arrays.asList(
+				playerData.ironMan,
+				playerData.ironManRestriction,
+				playerData.hcIronManDeath
+			));
 		}
+		parameterList.addAll(Arrays.asList(
+			playerData.questPoints,
+			playerData.hairColour,
+			playerData.topColour,
+			playerData.trouserColour,
+			playerData.skinColour,
+			playerData.headSprite,
+			playerData.bodySprite,
+			playerData.male ? 1 : 0,
+			playerData.combatStyle,
+			playerData.muteExpires,
+			playerData.bankSize,
+			playerData.groupId,
+			playerData.blockChat ? 1 : 0,
+			playerData.blockPrivate ? 1 : 0,
+			playerData.blockTrade ? 1 : 0,
+			playerData.blockDuel ? 1 : 0,
+			playerData.cameraAuto ? 1 : 0,
+			playerData.oneMouse ? 1 : 0,
+			playerData.soundOff ? 1 : 0,
+			playerId
+		));
+
+		executeUpdateQuery(getQueries().save_UpdateBasicInfo, parameterList.toArray());
 	}
 
 	@Override
 	protected void querySavePassword(int playerId, String newPassword) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().save_Password);
-			statement.setString(1, newPassword);
-			statement.setInt(2, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().save_Password, newPassword, playerId);
 	}
 
 	@Override
 	protected void querySavePreviousPasswords(int playerId, String newLastPass, String newEarlierPass) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().save_PreviousPasswords);
-			statement.setString(1, newLastPass);
-			statement.setString(2, newEarlierPass);
-			statement.setInt(3, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().save_PreviousPasswords, newLastPass, newEarlierPass, playerId);
 	}
 
 	@Override
 	protected void querySaveLastRecoveryTryId(int playerId, int lastRecoveryTryId) throws GameDatabaseException {
-		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().playerLastRecoveryTryId);
-			statement.setInt(1, lastRecoveryTryId);
-			statement.setInt(2, playerId);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().playerLastRecoveryTryId, lastRecoveryTryId, playerId);
 	}
 
 	@Override
 	protected void querySavePlayerInventory(int playerId, PlayerInventory[] inventory) throws GameDatabaseException {
 		try {
-			updateLongs(getQueries().save_DeleteInv, playerId);
+			executeUpdateQuery(getQueries().save_DeleteInv, playerId);
 			PreparedStatement statement = getConnection().prepareStatement(getQueries().save_InventoryAdd);
 			PreparedStatement statement2 = getConnection().prepareStatement(getQueries().save_ItemCreate);
 			for (PlayerInventory item : inventory) {
@@ -1909,7 +1701,7 @@ public class MySqlGameDatabase extends GameDatabase {
 			try {
 				statement.setInt(getServer().getConstants().getSkills().getSkillsCount() + 1, playerId);
 				for (PlayerSkills skill : currSkillLevels) {
-					statement.setInt(skill.skillId + 1, skill.skillCurLevel);
+					statement.setInt(skill.skillId + 1, skill.skillCurLevel); // TODO weird parameter indexing here..
 				}
 				statement.executeUpdate();
 			} finally {
@@ -1928,7 +1720,7 @@ public class MySqlGameDatabase extends GameDatabase {
 			try {
 				statement.setInt(getServer().getConstants().getSkills().getSkillsCount() + 1, playerId);
 				for (PlayerExperience exp : experience) {
-					statement.setInt(exp.skillId + 1, exp.experience);
+					statement.setInt(exp.skillId + 1, exp.experience); // TODO weird indexing here
 				}
 				statement.executeUpdate();
 			} finally {
@@ -1988,174 +1780,76 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryItemPurge(final Item item) throws GameDatabaseException {
-		try {
-			purgeItemID(item.getItemId());
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_ItemPurge);
-			try {
-				statement.setInt(1, item.getItemId());
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		purgeItemID(item.getItemId());
+		executeUpdateQuery(getQueries().save_ItemPurge, item.getItemId());
 	}
 
 	@Override
 	protected void queryItemUpdate(final Item item) throws GameDatabaseException {
-		try {
-			if (item.getItemId() == Item.ITEM_ID_UNASSIGNED) {
-				throw new GameDatabaseException(this, "An unassigned item attempted to be updated: " + item.getCatalogId());
-			}
-
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_ItemUpdate);
-			try {
-				statement.setInt(1, item.getAmount());
-				statement.setInt(2, item.getNoted() ? 1 : 0);
-				statement.setInt(3, item.isWielded() ? 1 : 0);
-				statement.setInt(4, item.getItemStatus().getDurability());
-				statement.setInt(5, item.getItemId());
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		if (item.getItemId() == Item.ITEM_ID_UNASSIGNED) {
+			throw new GameDatabaseException(this, "An unassigned item attempted to be updated: " + item.getCatalogId());
 		}
+
+		executeUpdateQuery(getQueries().save_ItemUpdate, item.getAmount(), item.getNoted() ? 1 : 0, item.isWielded() ? 1 : 0, item.getItemStatus().getDurability(), item.getItemId());
 	}
 
 	@Override
 	protected void queryInventoryAdd(final int playerId, final Item item, int slot) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			try {
-				int itemId = item.getItemId();
-				if (itemId == Item.ITEM_ID_UNASSIGNED) {
-					itemId = assignItemID(item);
-				}
-
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_InventoryAdd);
-				try {
-					statement.setInt(1, playerId);
-					statement.setInt(2, itemId);
-					statement.setInt(3, slot);
-					statement.executeUpdate();
-				} finally {
-					statement.close();
-				}
-			} catch (SQLException ex) {
-				// Convert SQLException to a general usage exception
-				throw new GameDatabaseException(this, ex.getMessage());
+			int itemId = item.getItemId();
+			if (itemId == Item.ITEM_ID_UNASSIGNED) {
+				itemId = assignItemID(item);
 			}
+
+			executeUpdateQuery(getQueries().save_InventoryAdd, playerId, itemId , slot);
 		}
 	}
 
 	@Override
 	protected void queryInventoryRemove(final int playerId, final Item item) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			try {
-				itemPurge(item);
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_InventoryRemove);
-				try {
-					statement.setInt(1, playerId);
-					statement.setInt(2, item.getItemId());
-					statement.executeUpdate();
-				} finally {
-					statement.close();
-				}
-			} catch (SQLException ex) {
-				// Convert SQLException to a general usage exception
-				throw new GameDatabaseException(this, ex.getMessage());
-			}
+			itemPurge(item);
+			executeUpdateQuery(getQueries().save_InventoryRemove, playerId, item.getItemId());
 		}
 	}
 
 	@Override
 	protected void queryEquipmentAdd(final int playerId, final Item item) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			try {
-				int itemId = item.getItemId();
-				if (itemId == Item.ITEM_ID_UNASSIGNED) {
-					itemId = assignItemID(item);
-				}
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_EquipmentAdd);
-				try {
-					statement.setInt(1, playerId);
-					statement.setInt(2, itemId);
-					statement.executeUpdate();
-				} finally {
-					statement.close();
-				}
-			} catch (SQLException ex) {
-				// Convert SQLException to a general usage exception
-				throw new GameDatabaseException(this, ex.getMessage());
+			int itemId = item.getItemId();
+			if (itemId == Item.ITEM_ID_UNASSIGNED) {
+				itemId = assignItemID(item);
 			}
+
+			executeUpdateQuery(getQueries().save_EquipmentAdd, playerId, itemId);
 		}
 	}
 
 	@Override
 	protected void queryEquipmentRemove(final int playerId, final Item item) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			try {
-				itemPurge(item);
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_EquipmentRemove);
-				try {
-					statement.setInt(1, playerId);
-					statement.setInt(2, item.getItemId());
-					statement.executeUpdate();
-				} finally {
-					statement.close();
-				}
-			} catch (SQLException ex) {
-				// Convert SQLException to a general usage exception
-				throw new GameDatabaseException(this, ex.getMessage());
-			}
+			itemPurge(item);
+			executeUpdateQuery(getQueries().save_EquipmentRemove, playerId, item.getItemId());
 		}
 	}
 
 	@Override
 	protected void queryBankAdd(final int playerId, final Item item, int slot) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			try {
-				int itemId = item.getItemId();
-				if (itemId == Item.ITEM_ID_UNASSIGNED) {
-					itemId = assignItemID(item);
-				}
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_BankAdd);
-				try {
-					statement.setInt(1, playerId);
-					statement.setInt(2, itemId);
-					statement.setInt(3, slot);
-					statement.executeUpdate();
-				} finally {
-					statement.close();
-				}
-			} catch (SQLException ex) {
-				// Convert SQLException to a general usage exception
-				throw new GameDatabaseException(this, ex.getMessage());
+			int itemId = item.getItemId();
+			if (itemId == Item.ITEM_ID_UNASSIGNED) {
+				itemId = assignItemID(item);
 			}
+
+			executeUpdateQuery(getQueries().save_BankAdd, playerId, itemId, slot);
 		}
 	}
 
 	@Override
 	protected void queryBankRemove(final int playerId, final Item item) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			try {
-				itemPurge(item);
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_BankRemove);
-				try {
-					statement.setInt(1, playerId);
-					statement.setInt(2, item.getItemId());
-					statement.executeUpdate();
-				} finally {
-					statement.close();
-				}
-			} catch (SQLException ex) {
-				// Convert SQLException to a general usage exception
-				throw new GameDatabaseException(this, ex.getMessage());
-			}
+			itemPurge(item);
+			executeUpdateQuery(getQueries().save_BankRemove, playerId, item.getItemId());
 		}
 	}
 
@@ -2181,29 +1875,12 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryPairPlayer(int playerId, long discordId) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().pairDiscord);
-			statement.setInt(1, playerId);
-			statement.setInt(2, 3);
-			statement.setString(3, "discordID");
-			statement.setLong(4, discordId);
-			try {statement.executeUpdate();}
-			finally {statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().pairDiscord, playerId, 3, "discordID", discordId);
 	}
 
 	@Override
 	protected void queryRemovePairToken(int playerId) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().deleteTokenFromCache);
-			statement.setInt(1, playerId);
-			try {statement.executeUpdate();}
-			finally {statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().deleteTokenFromCache, playerId);
 	}
 
 	@Override
@@ -2228,42 +1905,17 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryUpdateWatchlist(long discordId, String watchlist) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateWatchlist);
-			statement.setString(1, watchlist);
-			statement.setLong(2, discordId);
-			try {statement.executeUpdate();}
-			finally {statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().updateWatchlist, watchlist, discordId);
 	}
 
 	@Override
 	protected void queryNewWatchlist(long discordId, String watchlist) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddCache);
-			statement.setInt(1, 0);
-			statement.setInt(2, 1);
-			statement.setString(3, "watchlist_" + discordId);
-			statement.setString(4, watchlist);
-			try {statement.executeUpdate();}
-			finally {statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().save_AddCache, 0, 1, "watchlist_" + discordId, watchlist);
 	}
 
 	@Override
 	protected void queryDeleteWatchlist(long discordId) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().deleteWatchlist);
-			statement.setLong(1, discordId);
-			try {statement.executeUpdate();}
-			finally {statement.close();}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().deleteWatchlist, discordId);
 	}
 
 	@Override
@@ -2397,124 +2049,32 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryInsertNpcSpawn(NPCLoc loc) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().addNpcSpawn);
-			statement.setInt(1, loc.id);
-			statement.setInt(2, loc.startX);
-			statement.setInt(3, loc.minX);
-			statement.setInt(4, loc.maxX);
-			statement.setInt(5, loc.startY);
-			statement.setInt(6, loc.minY);
-			statement.setInt(7, loc.maxY);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().addNpcSpawn, loc.id, loc.startX, loc.minX, loc.maxX, loc.startY, loc.minY, loc.maxY);
 	}
 
 	@Override
 	protected void queryDeleteNpcSpawn(NPCLoc loc) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().removeNpcSpawn);
-			statement.setInt(1, loc.id);
-			statement.setInt(2, loc.startX);
-			statement.setInt(3, loc.minX);
-			statement.setInt(4, loc.maxX);
-			statement.setInt(5, loc.startY);
-			statement.setInt(6, loc.minY);
-			statement.setInt(7, loc.maxY);
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().removeNpcSpawn, loc.id, loc.startX, loc.minX, loc.maxX, loc.startY, loc.minY, loc.maxY);
 	}
 
 	@Override
 	protected void queryInsertObjectSpawn(GameObjectLoc loc) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().addObjectSpawn);
-			statement.setInt(1, loc.getX());
-			statement.setInt(2, loc.getY());
-			statement.setInt(3, loc.getId());
-			statement.setInt(4, loc.getDirection());
-			statement.setInt(5, loc.getType());
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().addObjectSpawn, loc.getX(), loc.getY(), loc.getId(), loc.getDirection(), loc.getType());
 	}
 
 	@Override
 	protected void queryDeleteObjectSpawn(GameObjectLoc loc) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().removeObjectSpawn);
-			statement.setInt(1, loc.getX());
-			statement.setInt(2, loc.getY());
-			statement.setInt(3, loc.getId());
-			statement.setInt(4, loc.getDirection());
-			statement.setInt(5, loc.getType());
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().removeObjectSpawn, loc.getX(), loc.getY(), loc.getId(), loc.getDirection(), loc.getType());
 	}
 
 	@Override
 	protected void queryDeleteItemSpawn(ItemLoc loc) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().removeItemSpawn);
-			statement.setInt(1, loc.getId());
-			statement.setInt(2, loc.getX());
-			statement.setInt(3, loc.getY());
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().removeItemSpawn, loc.getId(), loc.getX(), loc.getY());
 	}
 
 	@Override
 	protected void queryInsertItemSpawn(ItemLoc loc) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().addItemSpawn);
-			statement.setInt(1, loc.getId());
-			statement.setInt(2, loc.getX());
-			statement.setInt(3, loc.getY());
-			statement.setInt(4, loc.getAmount());
-			statement.setInt(5, loc.getRespawnTime());
-			try {
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		executeUpdateQuery(getQueries().addItemSpawn, loc.getId(), loc.getX(), loc.getY(), loc.getAmount(), loc.getRespawnTime());
 	}
 
 	private int[] fetchLevels(int playerID) throws SQLException {
@@ -2565,19 +2125,8 @@ public class MySqlGameDatabase extends GameDatabase {
 		return prepared;
 	}
 
-	private void updateLongs(String statement, int... intA) throws SQLException {
-		PreparedStatement prepared = null;
-		prepared = getConnection().prepareStatement(statement);
-
-		for (int i = 1; i <= intA.length; i++) {
-			prepared.setInt(i, intA[i - 1]);
-		}
-
-		try {
-			prepared.executeUpdate();
-		} finally {
-			prepared.close();
-		}
+	private void updateLongs(String statement, int... intA) throws GameDatabaseException {
+		executeUpdateQuery(statement, intA);
 	}
 
 	private List<Long> longListFromResultSet(ResultSet result, String param) throws SQLException {
