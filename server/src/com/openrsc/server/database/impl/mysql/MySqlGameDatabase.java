@@ -74,14 +74,13 @@ public class MySqlGameDatabase extends GameDatabase {
 		executeUpdateQuery(getQueries().initializeOnlineUsers);
 	}
 
-	protected void executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
+	protected int executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(query);
-			Object[] unpackParameters = unpackParameters(parameters);
+			final PreparedStatement statement = getConnection().prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
+			Object[] unpackedParameters = unpackParameters(parameters);
 
 			int parameterIndex = 1;
-			for (int i = 1; i <= unpackParameters.length; i++) {
-				Object parameter = unpackParameters[i - 1];
+			for (Object parameter : unpackedParameters) {
 				if (parameter instanceof Integer) {
 					statement.setInt(parameterIndex, (Integer) parameter);
 				} else if (parameter instanceof Long) {
@@ -97,11 +96,23 @@ public class MySqlGameDatabase extends GameDatabase {
 				parameterIndex++;
 			}
 
+			int lastInsertId = -1;
 			try {
 				statement.executeUpdate();
+
+				final ResultSet resultSet = statement.getGeneratedKeys();
+				try {
+					if (resultSet.next()) {
+						lastInsertId = resultSet.getInt(1);
+					}
+				} finally {
+					resultSet.close();
+				}
 			} finally {
 				statement.close();
 			}
+
+			return lastInsertId;
 		} catch (final SQLException ex) {
 			// Convert SQLException to a general usage exception
 			throw new GameDatabaseException(this, ex.getMessage());
@@ -990,26 +1001,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected int queryInsertRecoveryAttempt(int playerId, String username, long time, String ip) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerRecoveryAttempt, Statement.RETURN_GENERATED_KEYS);
-			statement.setInt(1, playerId);
-			statement.setString(2, username);
-			statement.setLong(3, time);
-			statement.setString(4, ip);
-			statement.executeUpdate();
-			final ResultSet resultSet = statement.getGeneratedKeys();
-			try {
-				if (resultSet.next()) {
-					return resultSet.getInt(1);
-				}
-				return -1;
-			} finally {
-				statement.close();
-				resultSet.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		return executeUpdateQuery(getQueries().playerRecoveryAttempt, playerId, username, time, ip);
 	}
 
 	@Override
@@ -1119,27 +1111,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected int queryNewClan(String name, String tag, String leader) throws GameDatabaseException {
-		try {
-			final PreparedStatement preparedStatement = getConnection().prepareStatement(getQueries().newClan, Statement.RETURN_GENERATED_KEYS);
-			preparedStatement.setString(1, name);
-			preparedStatement.setString(2, tag);
-			preparedStatement.setString(3, leader);
-			preparedStatement.executeUpdate();
-
-			final ResultSet resultSet = preparedStatement.getGeneratedKeys();
-
-			try {
-				if (resultSet.next()) {
-					return resultSet.getInt(1);
-				}
-				return -1;
-			} finally {
-				preparedStatement.close();
-				resultSet.close();
-			}
-		} catch (SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		return executeUpdateQuery(getQueries().newClan, name, tag, leader);
 	}
 
 	@Override
@@ -1764,27 +1736,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected int queryItemCreate(Item item) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_ItemCreate, Statement.RETURN_GENERATED_KEYS);
-			try {
-				statement.setInt(1, item.getCatalogId());
-				statement.setInt(2, item.getItemStatus().getAmount());
-				statement.setInt(3, item.getItemStatus().getNoted() ? 1 : 0);
-				statement.setInt(4, item.getItemStatus().isWielded() ? 1 : 0);
-				statement.setInt(5, item.getItemStatus().getDurability());
-				statement.executeUpdate();
-				ResultSet rs = statement.getGeneratedKeys();
-				int itemId = -1;
-				if (rs.next()) itemId = rs.getInt(1);
-				rs.close();
-				return itemId;
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
-		}
+		return executeUpdateQuery(getQueries().save_ItemCreate, item.getCatalogId(), item.getItemStatus().getAmount(), item.getItemStatus().getNoted() ? 1 : 0, item.getItemStatus().isWielded() ? 1 : 0, item.getItemStatus().getDurability());
 	}
 
 	@Override
