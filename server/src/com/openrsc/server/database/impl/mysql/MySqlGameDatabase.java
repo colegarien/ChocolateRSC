@@ -77,9 +77,11 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected void executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
 		try {
 			final PreparedStatement statement = getConnection().prepareStatement(query);
+			Object[] unpackParameters = unpackParameters(parameters);
+
 			int parameterIndex = 1;
-			for (int i = 1; i <= parameters.length; i++) {
-				Object parameter = parameters[i - 1];
+			for (int i = 1; i <= unpackParameters.length; i++) {
+				Object parameter = unpackParameters[i - 1];
 				if (parameter instanceof Integer) {
 					statement.setInt(parameterIndex, (Integer) parameter);
 				} else if (parameter instanceof Long) {
@@ -88,28 +90,6 @@ public class MySqlGameDatabase extends GameDatabase {
 					statement.setBoolean(parameterIndex, (Boolean) parameter);
 				} else if (parameter instanceof String) {
 					statement.setString(parameterIndex, (String) parameter);
-				} else if (parameter instanceof Object[]) {
-					Object[] array = (Object[]) parameter;
-					for (int j = 0; j < array.length; j++) {
-						// TODO this is a bit rough... and redundant; needs some DRYing up
-						Object innerParameter = array[j];
-						if (innerParameter instanceof Integer) {
-							statement.setInt(parameterIndex, (Integer) innerParameter);
-						} else if (innerParameter instanceof Long) {
-							statement.setLong(parameterIndex, (Long) innerParameter);
-						} else if (innerParameter instanceof Boolean) {
-							statement.setBoolean(parameterIndex, (Boolean) innerParameter);
-						} else if (innerParameter instanceof String) {
-							statement.setString(parameterIndex, (String) innerParameter);
-						} else {
-							throw new GameDatabaseException(this, "Unknown Inner Parameter(" + parameterIndex + ") Type \"" + innerParameter.getClass().getName() + "\"");
-						}
-
-						if (j != array.length - 1) {
-							parameterIndex++;
-						}
-					}
-
 				} else {
 					throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
 				}
@@ -126,6 +106,49 @@ public class MySqlGameDatabase extends GameDatabase {
 			// Convert SQLException to a general usage exception
 			throw new GameDatabaseException(this, ex.getMessage());
 		}
+	}
+
+	private Object[] unpackParameters(Object[] parameters) {
+		boolean hasPackedParameter = Arrays.stream(parameters).anyMatch(p -> p instanceof Object[]);
+		if(!hasPackedParameter){
+			return parameters;
+		}
+
+		ArrayList<Object> unpackedParameters = new ArrayList<Object>();
+		for (Object parameter : parameters) {
+			if (parameter instanceof Object[]) {
+				unpackedParameters.addAll(Arrays.asList(unpackParameters((Object[])parameter)));
+			} else{
+				unpackedParameters.add(parameter);
+			}
+		}
+
+		return unpackedParameters.toArray();
+	}
+	private int setStatementParameters(PreparedStatement statement, Object[] parameters, int baseParameterOffset) throws SQLException, GameDatabaseException {
+		int parameterIndex = baseParameterOffset;
+		for (int i = 1; i <= parameters.length; i++) {
+			Object parameter = parameters[i - 1];
+			if (parameter instanceof Integer) {
+				statement.setInt(parameterIndex, (Integer) parameter);
+			} else if (parameter instanceof Long) {
+				statement.setLong(parameterIndex, (Long) parameter);
+			} else if (parameter instanceof Boolean) {
+				statement.setBoolean(parameterIndex, (Boolean) parameter);
+			} else if (parameter instanceof String) {
+				statement.setString(parameterIndex, (String) parameter);
+			} else if (parameter instanceof Object[]) {
+				parameterIndex = setStatementParameters(statement, (Object[])parameter, parameterIndex);
+			} else {
+				throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
+			}
+
+			if (i != parameters.length - 1) {
+				parameterIndex++;
+			}
+		}
+
+		return parameterIndex;
 	}
 
 	@Override
