@@ -121,45 +121,20 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	private Object[] unpackParameters(Object[] parameters) {
 		boolean hasPackedParameter = Arrays.stream(parameters).anyMatch(p -> p instanceof Object[]);
-		if(!hasPackedParameter){
+		if (!hasPackedParameter) {
 			return parameters;
 		}
 
 		ArrayList<Object> unpackedParameters = new ArrayList<Object>();
 		for (Object parameter : parameters) {
 			if (parameter instanceof Object[]) {
-				unpackedParameters.addAll(Arrays.asList(unpackParameters((Object[])parameter)));
-			} else{
+				unpackedParameters.addAll(Arrays.asList(unpackParameters((Object[]) parameter)));
+			} else {
 				unpackedParameters.add(parameter);
 			}
 		}
 
 		return unpackedParameters.toArray();
-	}
-	private int setStatementParameters(PreparedStatement statement, Object[] parameters, int baseParameterOffset) throws SQLException, GameDatabaseException {
-		int parameterIndex = baseParameterOffset;
-		for (int i = 1; i <= parameters.length; i++) {
-			Object parameter = parameters[i - 1];
-			if (parameter instanceof Integer) {
-				statement.setInt(parameterIndex, (Integer) parameter);
-			} else if (parameter instanceof Long) {
-				statement.setLong(parameterIndex, (Long) parameter);
-			} else if (parameter instanceof Boolean) {
-				statement.setBoolean(parameterIndex, (Boolean) parameter);
-			} else if (parameter instanceof String) {
-				statement.setString(parameterIndex, (String) parameter);
-			} else if (parameter instanceof Object[]) {
-				parameterIndex = setStatementParameters(statement, (Object[])parameter, parameterIndex);
-			} else {
-				throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
-			}
-
-			if (i != parameters.length - 1) {
-				parameterIndex++;
-			}
-		}
-
-		return parameterIndex;
 	}
 
 	@Override
@@ -967,7 +942,7 @@ public class MySqlGameDatabase extends GameDatabase {
 					}
 					recoveryQuestions.dateSet = resultSet.getInt("date_set");
 					recoveryQuestions.ipSet = resultSet.getString("ip_set");
-					if(tableName.equals("player_recovery")) {
+					if (tableName.equals("player_recovery")) {
 						recoveryQuestions.previousPass = resultSet.getString("previous_pass");
 						recoveryQuestions.earlierPass = resultSet.getString("earlier_pass");
 					}
@@ -1169,8 +1144,11 @@ public class MySqlGameDatabase extends GameDatabase {
 				statement.setString(5, expiredAuction.explanation);
 				statement.addBatch();
 			}
-			try{statement.executeBatch();}
-			finally{statement.close();}
+			try {
+				statement.executeBatch();
+			} finally {
+				statement.close();
+			}
 		} catch (final SQLException ex) {
 			throw new GameDatabaseException(this, ex.getMessage());
 		}
@@ -1214,8 +1192,11 @@ public class MySqlGameDatabase extends GameDatabase {
 				statement.setInt(2, item.claim_id);
 				statement.addBatch();
 			}
-			try {statement.executeBatch();}
-			finally {statement.close();}
+			try {
+				statement.executeBatch();
+			} finally {
+				statement.close();
+			}
 		} catch (final SQLException ex) {
 			throw new GameDatabaseException(this, ex.getMessage());
 		}
@@ -1722,8 +1703,7 @@ public class MySqlGameDatabase extends GameDatabase {
 				if (result.next()) {
 					return result.getInt("itemID");
 				}
-			}
-			finally {
+			} finally {
 				result.close();
 				statement.close();
 			}
@@ -1762,7 +1742,7 @@ public class MySqlGameDatabase extends GameDatabase {
 				itemId = assignItemID(item);
 			}
 
-			executeUpdateQuery(getQueries().save_InventoryAdd, playerId, itemId , slot);
+			executeUpdateQuery(getQueries().save_InventoryAdd, playerId, itemId, slot);
 		}
 	}
 
@@ -2156,8 +2136,7 @@ public class MySqlGameDatabase extends GameDatabase {
 				return assignItemID(item);
 			}
 			return itemId;
-		}
-		catch (GameDatabaseException e) {
+		} catch (GameDatabaseException e) {
 			System.out.println(e);
 		}
 		return Item.ITEM_ID_UNASSIGNED;
@@ -2166,8 +2145,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	public void removeItemFromPlayer(Item item) {
 		try {
 			itemPurge(item);
-		}
-		catch (GameDatabaseException e) {
+		} catch (GameDatabaseException e) {
 			System.out.println(e);
 		}
 	}
