@@ -1696,40 +1696,26 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySavePlayerSkills(int playerId, PlayerSkills[] currSkillLevels) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateStats);
-			try {
-				statement.setInt(getServer().getConstants().getSkills().getSkillsCount() + 1, playerId);
-				for (PlayerSkills skill : currSkillLevels) {
-					statement.setInt(skill.skillId + 1, skill.skillCurLevel); // TODO weird parameter indexing here..
-				}
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		var parameterList = new ArrayList<Object>();
+		Arrays.sort(currSkillLevels, Comparator.comparingInt(s -> s.skillId));
+		for (PlayerSkills skill : currSkillLevels) {
+			parameterList.add(skill.skillCurLevel);
 		}
+		parameterList.add(playerId);
+
+		executeUpdateQuery(getQueries().updateStats, parameterList);
 	}
 
 	@Override
 	protected void querySavePlayerExperience(int playerId, PlayerExperience[] experience) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().updateExperience);
-			try {
-				statement.setInt(getServer().getConstants().getSkills().getSkillsCount() + 1, playerId);
-				for (PlayerExperience exp : experience) {
-					statement.setInt(exp.skillId + 1, exp.experience); // TODO weird indexing here
-				}
-				statement.executeUpdate();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		var parameterList = new ArrayList<Object>();
+		Arrays.sort(experience, Comparator.comparingInt(s -> s.skillId));
+		for (PlayerExperience exp : experience) {
+			parameterList.add(exp.experience);
 		}
+		parameterList.add(playerId);
+
+		executeUpdateQuery(getQueries().updateExperience, parameterList);
 	}
 
 	@Override
