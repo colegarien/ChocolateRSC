@@ -74,27 +74,48 @@ public class MySqlGameDatabase extends GameDatabase {
 		executeUpdateQuery(getQueries().initializeOnlineUsers);
 	}
 
-	protected int executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
+	protected void executeBatchUpdateQuery(String query, Object[][] records) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
-			Object[] unpackedParameters = unpackParameters(parameters);
+			final PreparedStatement statement = getConnection().prepareStatement(query);
+			for (Object[] parameters : records) {
+				// TODO this is copy+pasted from CreateStatement!
+				Object[] unpackedParameters = unpackParameters(parameters);
 
-			int parameterIndex = 1;
-			for (Object parameter : unpackedParameters) {
-				if (parameter instanceof Integer) {
-					statement.setInt(parameterIndex, (Integer) parameter);
-				} else if (parameter instanceof Long) {
-					statement.setLong(parameterIndex, (Long) parameter);
-				} else if (parameter instanceof Boolean) {
-					statement.setBoolean(parameterIndex, (Boolean) parameter);
-				} else if (parameter instanceof String) {
-					statement.setString(parameterIndex, (String) parameter);
-				} else {
-					throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
+				int parameterIndex = 1;
+				for (Object parameter : unpackedParameters) {
+					if (parameter instanceof Integer) {
+						statement.setInt(parameterIndex, (Integer) parameter);
+					} else if (parameter instanceof Long) {
+						statement.setLong(parameterIndex, (Long) parameter);
+					} else if (parameter instanceof Boolean) {
+						statement.setBoolean(parameterIndex, (Boolean) parameter);
+					} else if (parameter instanceof String) {
+						statement.setString(parameterIndex, (String) parameter);
+					} else if (parameter instanceof Byte[]) {
+						statement.setBlob(parameterIndex, new javax.sql.rowset.serial.SerialBlob((byte[]) parameter));
+					} else {
+						throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
+					}
+
+					parameterIndex++;
 				}
 
-				parameterIndex++;
+				statement.addBatch();
 			}
+			try {
+				statement.executeBatch();
+			} finally {
+				statement.close();
+			}
+
+		} catch (SQLException ex) {
+			throw new GameDatabaseException(this, ex.getMessage());
+		}
+	}
+
+	protected int executeUpdateQuery(String query, Object... parameters) throws GameDatabaseException {
+		try {
+			PreparedStatement statement = createStatement(query, parameters);
 
 			int lastInsertId = -1;
 			try {
@@ -119,6 +140,32 @@ public class MySqlGameDatabase extends GameDatabase {
 		}
 	}
 
+	private PreparedStatement createStatement(String query, Object... parameters) throws GameDatabaseException, SQLException {
+		final PreparedStatement statement = getConnection().prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
+		Object[] unpackedParameters = unpackParameters(parameters);
+
+		int parameterIndex = 1;
+		for (Object parameter : unpackedParameters) {
+			if (parameter instanceof Integer) {
+				statement.setInt(parameterIndex, (Integer) parameter);
+			} else if (parameter instanceof Long) {
+				statement.setLong(parameterIndex, (Long) parameter);
+			} else if (parameter instanceof Boolean) {
+				statement.setBoolean(parameterIndex, (Boolean) parameter);
+			} else if (parameter instanceof String) {
+				statement.setString(parameterIndex, (String) parameter);
+			} else if (parameter instanceof byte[]) {
+				statement.setBlob(parameterIndex, new javax.sql.rowset.serial.SerialBlob((byte[]) parameter));
+			} else {
+				throw new GameDatabaseException(this, "Unknown Parameter(" + parameterIndex + ") Type \"" + parameter.getClass().getName() + "\"");
+			}
+
+			parameterIndex++;
+		}
+
+		return statement;
+	}
+
 	private Object[] unpackParameters(Object[] parameters) {
 		boolean hasPackedParameter = Arrays.stream(parameters).anyMatch(p -> p instanceof Object[]);
 		if (!hasPackedParameter) {
@@ -127,7 +174,7 @@ public class MySqlGameDatabase extends GameDatabase {
 
 		ArrayList<Object> unpackedParameters = new ArrayList<Object>();
 		for (Object parameter : parameters) {
-			if (parameter instanceof Object[]) {
+			if (parameter instanceof Object[] && !(parameter instanceof Byte[])) {
 				unpackedParameters.addAll(Arrays.asList(unpackParameters((Object[]) parameter)));
 			} else {
 				unpackedParameters.add(parameter);
@@ -150,7 +197,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected boolean queryPlayerExists(String username) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = statementFromString(getQueries().userToId, username);
+			final PreparedStatement statement = createStatement(getQueries().userToId, username);
 			final ResultSet result = statement.executeQuery();
 			try {
 				boolean playerExists = result.isBeforeFirst();
@@ -168,7 +215,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryPlayerIdFromUsername(String username) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = statementFromString(getQueries().userToId, username);
+			final PreparedStatement statement = createStatement(getQueries().userToId, username);
 			final ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -188,7 +235,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected String queryUsernameFromPlayerId(int playerId) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = statementFromInteger(getQueries().idToUser, playerId);
+			final PreparedStatement statement = createStatement(getQueries().idToUser, playerId);
 			final ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -226,7 +273,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected NpcLocation[] queryNpcLocations() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().npcLocs);
+			final PreparedStatement statement = createStatement(getQueries().npcLocs);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<NpcLocation> npcLocs = new ArrayList<>();
@@ -256,7 +303,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected SceneryObject[] queryObjects() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().objects);
+			final PreparedStatement statement = createStatement(getQueries().objects);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<SceneryObject> objects = new ArrayList<>();
@@ -284,7 +331,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected FloorItem[] queryGroundItems() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().groundItems);
+			final PreparedStatement statement = createStatement(getQueries().groundItems);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<FloorItem> groundItems = new ArrayList<>();
@@ -312,7 +359,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected Integer[] queryInUseItemIds() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().inUseItemIds);
+			final PreparedStatement statement = createStatement(getQueries().inUseItemIds);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<Integer> inUseItemIds = new ArrayList<>();
@@ -333,8 +380,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected PlayerLoginData queryPlayerLoginData(String username) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerLoginData);
-			statement.setString(1, username);
+			final PreparedStatement statement = createStatement(getQueries().playerLoginData, username);
 			final ResultSet playerSet = statement.executeQuery();
 
 			final PlayerLoginData loginData = new PlayerLoginData();
@@ -369,10 +415,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected boolean queryRecentlyRegistered(String ipAddress) throws GameDatabaseException {
 		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().recentlyRegistered);
-			statement.setString(1, ipAddress);
-			statement.setLong(2, (System.currentTimeMillis() / 1000) - 60);
-
+			PreparedStatement statement = createStatement(getQueries().recentlyRegistered, ipAddress, (System.currentTimeMillis() / 1000) - 60);
 			ResultSet result = statement.executeQuery();
 
 			try {
@@ -404,7 +447,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			PlayerData playerData = new PlayerData();
 
-			final PreparedStatement statement = statementFromString(getQueries().playerData, player.getUsername());
+			final PreparedStatement statement = createStatement(getQueries().playerData, player.getUsername());
 			final ResultSet result = statement.executeQuery();
 
 			try {
@@ -467,7 +510,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected PlayerInventory[] queryLoadPlayerInvItems(Player player) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = statementFromInteger(getQueries().playerInvItems, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerInvItems, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 			final ArrayList<PlayerInventory> list = new ArrayList<>();
 
@@ -501,7 +544,7 @@ public class MySqlGameDatabase extends GameDatabase {
 			final ArrayList<PlayerEquipped> list = new ArrayList<>();
 
 			if (getServer().getConfig().WANT_EQUIPMENT_TAB) {
-				final PreparedStatement statement = statementFromInteger(getQueries().playerEquipped, player.getDatabaseID());
+				final PreparedStatement statement = createStatement(getQueries().playerEquipped, player.getDatabaseID());
 				final ResultSet result = statement.executeQuery();
 
 				try {
@@ -536,7 +579,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final ArrayList<PlayerBank> list = new ArrayList<>();
 
-			final PreparedStatement statement = statementFromInteger(getQueries().playerBankItems, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerBankItems, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 
 			try {
@@ -571,7 +614,7 @@ public class MySqlGameDatabase extends GameDatabase {
 			ArrayList<PlayerBankPreset> list = new ArrayList<>();
 
 			if (getServer().getConfig().WANT_BANK_PRESETS) {
-				final PreparedStatement statement = statementFromInteger(getQueries().playerBankPresets, player.getDatabaseID());
+				final PreparedStatement statement = createStatement(getQueries().playerBankPresets, player.getDatabaseID());
 				final ResultSet result = statement.executeQuery();
 
 				try {
@@ -622,7 +665,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected PlayerFriend[] queryLoadPlayerFriends(Player player) throws GameDatabaseException {
 		try {
 			final ArrayList<PlayerFriend> list = new ArrayList<>();
-			final PreparedStatement statement = statementFromInteger(getQueries().playerFriends, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerFriends, player.getDatabaseID());
 
 			final List<Long> friends = longListFromResultSet(statement.executeQuery(), "friend");
 
@@ -648,7 +691,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected PlayerIgnore[] queryLoadPlayerIgnored(Player player) throws GameDatabaseException {
 		try {
 			final ArrayList<PlayerIgnore> list = new ArrayList<>();
-			final PreparedStatement statement = statementFromInteger(getQueries().playerIgnored, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerIgnored, player.getDatabaseID());
 
 			final List<Long> friends = longListFromResultSet(statement.executeQuery(), "ignore");
 
@@ -674,7 +717,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			ArrayList<PlayerQuest> list = new ArrayList<>();
 
-			final PreparedStatement statement = statementFromInteger(getQueries().playerQuests, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerQuests, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 
 			try {
@@ -702,7 +745,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final ArrayList<PlayerAchievement> list = new ArrayList<>();
 
-			final PreparedStatement statement = statementFromInteger(getQueries().playerAchievements, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerAchievements, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 
 			try {
@@ -730,7 +773,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final ArrayList<PlayerCache> list = new ArrayList<>();
 
-			final PreparedStatement statement = statementFromInteger(getQueries().playerCache, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerCache, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 
 			try {
@@ -759,7 +802,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final ArrayList<PlayerNpcKills> list = new ArrayList<>();
 
-			final PreparedStatement statement = statementFromInteger(getQueries().npcKillSelectAll, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().npcKillSelectAll, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 
 			try {
@@ -820,8 +863,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected String queryPreviousPassword(int playerId) throws GameDatabaseException {
 		String returnVal = "";
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().previousPassword);
-			statement.setInt(1, playerId);
+			final PreparedStatement statement = createStatement(getQueries().previousPassword, playerId);
 			final ResultSet result = statement.executeQuery();
 			try {
 				if (!result.next()) {
@@ -844,8 +886,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected LinkedList<Achievement> queryLoadAchievements() throws GameDatabaseException {
 		LinkedList<Achievement> loadedAchievements = new LinkedList<Achievement>();
 		try {
-			PreparedStatement fetchAchievement = getConnection().prepareStatement(getQueries().achievements);
-
+			PreparedStatement fetchAchievement = createStatement(getQueries().achievements);
 			ResultSet result = fetchAchievement.executeQuery();
 			try {
 				while (result.next()) {
@@ -873,10 +914,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		ArrayList<AchievementReward> rewards = new ArrayList<AchievementReward>();
 
 		try {
-			PreparedStatement fetchRewards = getConnection()
-				.prepareStatement(getQueries().rewards);
-			fetchRewards.setInt(1, achievementId);
-
+			PreparedStatement fetchRewards = createStatement(getQueries().rewards, achievementId);
 			ResultSet rewardResult = fetchRewards.executeQuery();
 			try {
 				while (rewardResult.next()) {
@@ -900,9 +938,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		ArrayList<AchievementTask> tasks = new ArrayList<AchievementTask>();
 
 		try {
-			PreparedStatement fetchTasks = getConnection().prepareStatement(getQueries().tasks);
-			fetchTasks.setInt(1, achievementId);
-
+			PreparedStatement fetchTasks = createStatement(getQueries().tasks, achievementId);
 			ResultSet taskResult = fetchTasks.executeQuery();
 			try {
 				while (taskResult.next()) {
@@ -925,8 +961,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected PlayerRecoveryQuestions queryPlayerRecoveryData(int playerId, String tableName) throws GameDatabaseException {
 		try {
 			PlayerRecoveryQuestions recoveryQuestions = new PlayerRecoveryQuestions();
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerRecoveryInfo.replace(getQueries().TABLENAME_PLACEHOLDER, tableName));
-			statement.setInt(1, playerId);
+			final PreparedStatement statement = createStatement(getQueries().playerRecoveryInfo.replace(getQueries().TABLENAME_PLACEHOLDER, tableName), playerId);
 			final ResultSet resultSet = statement.executeQuery();
 
 			try {
@@ -987,8 +1022,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected PlayerContactDetails queryContactDetails(int playerId) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().contactDetails);
-			statement.setInt(1, playerId);
+			final PreparedStatement statement = createStatement(getQueries().contactDetails, playerId);
 			final ResultSet result = statement.executeQuery();
 			final PlayerContactDetails contactDetails = new PlayerContactDetails();
 			try {
@@ -1029,7 +1063,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final ArrayList<ClanDef> clans = new ArrayList<>();
 
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().clans);
+			final PreparedStatement statement = createStatement(getQueries().clans);
 			final ResultSet resultSet = statement.executeQuery();
 
 			try {
@@ -1060,8 +1094,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final ArrayList<ClanMember> clanMembers = new ArrayList<>();
 
-			final PreparedStatement preparedStatement = getConnection().prepareStatement(getQueries().clanMembers);
-			preparedStatement.setInt(1, clanId);
+			final PreparedStatement preparedStatement = createStatement(getQueries().clanMembers, clanId);
 			final ResultSet resultSet = preparedStatement.executeQuery();
 
 			try {
@@ -1157,8 +1190,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected ExpiredAuction[] queryCollectibleItems(int playerId) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().collectibleItems);
-			statement.setInt(1, playerId);
+			final PreparedStatement statement = createStatement(getQueries().collectibleItems, playerId);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<ExpiredAuction> expiredAuctions = new ArrayList<>();
@@ -1215,7 +1247,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryAuctionCount() throws GameDatabaseException {
 		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().auctionCount);
+			PreparedStatement statement = createStatement(getQueries().auctionCount);
 			ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -1235,8 +1267,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryPlayerAuctionCount(int playerId) throws GameDatabaseException {
 		try {
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().playerAuctionCount);
-			statement.setInt(1, playerId);
+			PreparedStatement statement = createStatement(getQueries().playerAuctionCount, playerId);
 			ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -1256,8 +1287,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected AuctionItem queryAuctionItem(int auctionId) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().auctionItem);
-			statement.setInt(1, auctionId);
+			final PreparedStatement statement = createStatement(getQueries().auctionItem, auctionId);
 			final ResultSet result = statement.executeQuery();
 
 			final AuctionItem auctionItem = new AuctionItem();
@@ -1288,7 +1318,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected AuctionItem[] queryAuctionItems() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().auctionItems);
+			final PreparedStatement statement = createStatement(getQueries().auctionItems);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<AuctionItem> auctionItems = new ArrayList<>();
@@ -1390,35 +1420,29 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySavePlayerInventory(int playerId, PlayerInventory[] inventory) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteInv, playerId);
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().save_InventoryAdd);
-			PreparedStatement statement2 = getConnection().prepareStatement(getQueries().save_ItemCreate);
-			for (PlayerInventory item : inventory) {
-				statement.setInt(1, playerId);
-				statement.setInt(2, item.itemId);
-				statement.setInt(3, item.slot);
-				statement.addBatch();
+		executeUpdateQuery(getQueries().save_DeleteInv, playerId);
 
-				statement2.setInt(1, item.itemId);
-				statement2.setInt(2, item.catalogID);
-				statement2.setInt(3, item.amount);
-				statement2.setInt(4, item.noted ? 1 : 0);
-				statement2.setInt(5, item.wielded ? 1 : 0);
-				statement2.setInt(6, item.durability);
-				statement2.addBatch();
-			}
-			try {
-				statement.executeBatch();
-				statement2.executeBatch();
-			} finally {
-				statement.close();
-				statement2.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		ArrayList<Object[]> records1 = new ArrayList<Object[]>();
+		ArrayList<Object[]> records2 = new ArrayList<Object[]>();
+		for (PlayerInventory item : inventory) {
+			records1.add(new Object[]{
+				playerId,
+				item.itemId,
+				item.slot
+			});
+
+			records2.add(new Object[]{
+				item.itemId,
+				item.catalogID,
+				item.amount,
+				item.noted ? 1 : 0,
+				item.wielded ? 1 : 0,
+				item.durability
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().save_InventoryAdd, records1.toArray(new Object[][] {}));
+		executeBatchUpdateQuery(getQueries().save_ItemCreate, records2.toArray(new Object[][] {}));
 	}
 
 	@Override
@@ -1626,7 +1650,7 @@ public class MySqlGameDatabase extends GameDatabase {
 		try {
 			final Map<Integer, Integer> uniqueIDMap = new HashMap<>();
 
-			final PreparedStatement statement = statementFromInteger(getQueries().npcKillSelectAll, playerId);
+			final PreparedStatement statement = createStatement(getQueries().npcKillSelectAll, playerId);
 			final ResultSet result = statement.executeQuery();
 			try {
 				while (result.next()) {
@@ -1697,7 +1721,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryMaxItemID() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().max_itemStatus);
+			final PreparedStatement statement = createStatement(getQueries().max_itemStatus);
 			ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -1797,8 +1821,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryPlayerIdFromToken(String token) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerIdFromPairToken);
-			statement.setString(1, token);
+			final PreparedStatement statement = createStatement(getQueries().playerIdFromPairToken, token);
 			final ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -1827,8 +1850,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected String queryWatchlist(long discordId) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().watchlist);
-			statement.setLong(1, discordId);
+			final PreparedStatement statement = createStatement(getQueries().watchlist, discordId);
 			final ResultSet result = statement.executeQuery();
 			try {
 				if (result.next()) {
@@ -1862,7 +1884,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected DiscordWatchlist[] queryWatchlists() throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().watchlists);
+			final PreparedStatement statement = createStatement(getQueries().watchlists);
 			final ResultSet result = statement.executeQuery();
 			final ArrayList<DiscordWatchlist> watchlists = new ArrayList<>();
 			try {
@@ -1886,8 +1908,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected int queryPlayerIdFromDiscordId(long discordId) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().discordIdToPlayerId);
-			statement.setLong(1, discordId);
+			final PreparedStatement statement = createStatement(getQueries().discordIdToPlayerId, discordId);
 			final ResultSet results = statement.executeQuery();
 			try {
 				if (results.next()) {
@@ -1907,7 +1928,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	protected PlayerRecoveryQuestions[] queryPlayerRecoveryChanges(Player player) throws GameDatabaseException {
 		try {
 			final ArrayList<PlayerRecoveryQuestions> list = new ArrayList<>();
-			final PreparedStatement statement = statementFromInteger(getQueries().playerPendingRecovery, player.getDatabaseID());
+			final PreparedStatement statement = createStatement(getQueries().playerPendingRecovery, player.getDatabaseID());
 			final ResultSet result = statement.executeQuery();
 			try {
 				while (result.next()) {
@@ -1939,8 +1960,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected String queryPlayerLoginIp(String username) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().fetchLoginIp);
-			statement.setString(1, username);
+			final PreparedStatement statement = createStatement(getQueries().fetchLoginIp, username);
 			final ResultSet result = statement.executeQuery();
 			String ip = null;
 			try {
@@ -1960,8 +1980,7 @@ public class MySqlGameDatabase extends GameDatabase {
 	@Override
 	protected LinkedPlayer[] queryLinkedPlayers(String ip) throws GameDatabaseException {
 		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().fetchLinkedPlayers);
-			statement.setString(1, ip);
+			final PreparedStatement statement = createStatement(getQueries().fetchLinkedPlayers, ip);
 			final ResultSet result = statement.executeQuery();
 
 			final ArrayList<LinkedPlayer> list = new ArrayList<>();
@@ -2018,8 +2037,8 @@ public class MySqlGameDatabase extends GameDatabase {
 		executeUpdateQuery(getQueries().addItemSpawn, loc.getId(), loc.getX(), loc.getY(), loc.getAmount(), loc.getRespawnTime());
 	}
 
-	private int[] fetchLevels(int playerID) throws SQLException {
-		final PreparedStatement statement = statementFromInteger(getQueries().playerCurExp, playerID);
+	private int[] fetchLevels(int playerID) throws SQLException, GameDatabaseException {
+		final PreparedStatement statement = createStatement(getQueries().playerCurExp, playerID);
 		final ResultSet result = statement.executeQuery();
 
 		try {
@@ -2036,10 +2055,9 @@ public class MySqlGameDatabase extends GameDatabase {
 		}
 	}
 
-	private int[] fetchExperience(int playerID) throws SQLException {
+	private int[] fetchExperience(int playerID) throws SQLException, GameDatabaseException {
 		final int[] data = new int[getServer().getConstants().getSkills().getSkillsCount()];
-		final PreparedStatement statement = getConnection().prepareStatement(getQueries().playerExp);
-		statement.setInt(1, playerID);
+		final PreparedStatement statement = createStatement(getQueries().playerExp, playerID);
 		final ResultSet result = statement.executeQuery();
 		try {
 			if (result.next()) {
