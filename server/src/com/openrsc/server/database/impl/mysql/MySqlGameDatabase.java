@@ -1124,25 +1124,18 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySaveClanMembers(final int clanId, final ClanMember[] clanMembers) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().saveClanMember);
-			for (ClanMember clanMember : clanMembers) {
-				statement.setInt(1, clanId);
-				statement.setString(2, clanMember.username);
-				statement.setInt(3, clanMember.rank);
-				statement.setInt(4, clanMember.kills);
-				statement.setInt(5, clanMember.deaths);
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-
-		} catch (SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (ClanMember clanMember : clanMembers) {
+			records.add(new Object[]{
+				clanId,
+				clanMember.username,
+				clanMember.rank,
+				clanMember.kills,
+				clanMember.deaths
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().saveClanMember, records.toArray(new Object[][]{}));
 	}
 
 	@Override
@@ -1167,24 +1160,18 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryExpiredAuction(ExpiredAuction[] expiredAuctions) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().expiredAuction);
-			for (ExpiredAuction expiredAuction : expiredAuctions) {
-				statement.setInt(1, expiredAuction.item_id);
-				statement.setInt(2, expiredAuction.item_amount);
-				statement.setLong(3, expiredAuction.time);
-				statement.setInt(4, expiredAuction.playerID);
-				statement.setString(5, expiredAuction.explanation);
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (ExpiredAuction expiredAuction : expiredAuctions) {
+			records.add(new Object[]{
+				expiredAuction.item_id,
+				expiredAuction.item_amount,
+				expiredAuction.time,
+				expiredAuction.playerID,
+				expiredAuction.explanation
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().expiredAuction, records.toArray(new Object[][]{}));
 	}
 
 	@Override
@@ -1217,21 +1204,15 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void queryCollectItems(ExpiredAuction[] claimedItems) throws GameDatabaseException {
-		try {
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().collectItem);
-			for (ExpiredAuction item : claimedItems) {
-				statement.setLong(1, item.claim_time);
-				statement.setInt(2, item.claim_id);
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			throw new GameDatabaseException(this, ex.getMessage());
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (ExpiredAuction item : claimedItems) {
+			records.add(new Object[]{
+				item.claim_time,
+				item.claim_id
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().collectItem, records.toArray(new Object[][]{}));
 	}
 
 	@Override
@@ -1441,180 +1422,141 @@ public class MySqlGameDatabase extends GameDatabase {
 			});
 		}
 
-		executeBatchUpdateQuery(getQueries().save_InventoryAdd, records1.toArray(new Object[][] {}));
-		executeBatchUpdateQuery(getQueries().save_ItemCreate, records2.toArray(new Object[][] {}));
+		executeBatchUpdateQuery(getQueries().save_InventoryAdd, records1.toArray(new Object[][]{}));
+		executeBatchUpdateQuery(getQueries().save_ItemCreate, records2.toArray(new Object[][]{}));
 	}
 
 	@Override
 	protected void querySavePlayerEquipped(int playerId, PlayerEquipped[] equipment) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteEquip, playerId);
-			PreparedStatement statement = getConnection().prepareStatement(getQueries().save_EquipmentAdd);
-			PreparedStatement statement2 = getConnection().prepareStatement(getQueries().save_ItemCreate);
-			for (PlayerEquipped item : equipment) {
-				statement.setInt(1, playerId);
-				statement.setInt(2, item.itemId);
-				statement.addBatch();
+		executeUpdateQuery(getQueries().save_DeleteEquip, playerId);
 
-				statement2.setInt(1, item.itemId);
-				statement2.setInt(2, item.itemStatus.getCatalogId());
-				statement2.setInt(3, item.itemStatus.getAmount());
-				statement2.setInt(4, item.itemStatus.getNoted() ? 1 : 0);
-				statement2.setInt(5, 1);
-				statement2.setInt(6, item.itemStatus.getDurability());
-				statement2.addBatch();
-			}
-			try {
-				statement.executeBatch();
-				statement2.executeBatch();
-			} finally {
-				statement.close();
-				statement2.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		ArrayList<Object[]> records1 = new ArrayList<Object[]>();
+		ArrayList<Object[]> records2 = new ArrayList<Object[]>();
+		for (PlayerEquipped item : equipment) {
+			records1.add(new Object[]{
+				playerId,
+				item.itemId
+			});
+
+			records2.add(new Object[]{
+				item.itemId,
+				item.itemStatus.getCatalogId(),
+				item.itemStatus.getAmount(),
+				item.itemStatus.getNoted() ? 1 : 0,
+				1,
+				item.itemStatus.getDurability()
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().save_EquipmentAdd, records1.toArray(new Object[][]{}));
+		executeBatchUpdateQuery(getQueries().save_ItemCreate, records2.toArray(new Object[][]{}));
 	}
 
 	@Override
 	protected void querySavePlayerBank(int playerId, PlayerBank[] bank) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteBank, playerId);
-			if (bank.length > 0) {
-				PreparedStatement statement = getConnection().prepareStatement(getQueries().save_BankAdd);
-				PreparedStatement statement2 = getConnection().prepareStatement(getQueries().save_ItemCreate);
-				int slot = 0;
-				for (PlayerBank item : bank) {
-					statement.setInt(1, playerId);
-					statement.setInt(2, item.itemId);
-					statement.setInt(3, slot++);
-					statement.addBatch();
+		executeUpdateQuery(getQueries().save_DeleteBank, playerId);
+		if (bank.length > 0) {
+			ArrayList<Object[]> records1 = new ArrayList<Object[]>();
+			ArrayList<Object[]> records2 = new ArrayList<Object[]>();
+			int slot = 0;
+			for (PlayerBank item : bank) {
+				records1.add(new Object[]{
+					playerId,
+					item.itemId,
+					slot++
+				});
 
-					statement2.setInt(1, item.itemId);
-					statement2.setInt(2, item.itemStatus.getCatalogId());
-					statement2.setInt(3, item.itemStatus.getAmount());
-					statement2.setInt(4, item.itemStatus.getNoted() ? 1 : 0);
-					statement2.setInt(5, 0);
-					statement2.setInt(6, item.itemStatus.getDurability());
-					statement2.addBatch();
-				}
-				try {
-					statement.executeBatch();
-					statement2.executeBatch();
-				} finally {
-					statement.close();
-					statement2.close();
-				}
+				records2.add(new Object[]{
+					item.itemId,
+					item.itemStatus.getCatalogId(),
+					item.itemStatus.getAmount(),
+					item.itemStatus.getNoted() ? 1 : 0,
+					0,
+					item.itemStatus.getDurability()
+				});
 			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+
+			executeBatchUpdateQuery(getQueries().save_BankAdd, records1.toArray(new Object[][]{}));
+			executeBatchUpdateQuery(getQueries().save_ItemCreate, records2.toArray(new Object[][]{}));
 		}
 	}
 
 	@Override
 	protected void querySavePlayerBankPresets(int playerId, PlayerBankPreset[] bankPreset) throws GameDatabaseException {
-		try {
-			if (getServer().getConfig().WANT_BANK_PRESETS) {
-				final PreparedStatement removeStatement = getConnection().prepareStatement(getQueries().save_BankPresetRemove);
-				try {
-					for (int i = 0; i < BankPreset.PRESET_COUNT; ++i) {
-						removeStatement.setInt(1, playerId);
-						removeStatement.setInt(2, i);
-						removeStatement.addBatch();
-					}
-					removeStatement.executeBatch();
-				} finally {
-					removeStatement.close();
-				}
+		if (getServer().getConfig().WANT_BANK_PRESETS) {
 
-				final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_BankPresetAdd);
-				try {
-					for (PlayerBankPreset playerBankPreset : bankPreset) {
-						statement.setInt(1, playerId);
-						statement.setInt(2, playerBankPreset.slot);
-						statement.setBlob(3, new javax.sql.rowset.serial.SerialBlob(playerBankPreset.inventory));
-						statement.setBlob(4, new javax.sql.rowset.serial.SerialBlob(playerBankPreset.equipment));
-						statement.addBatch();
-					}
-					statement.executeBatch();
-				} finally {
-					statement.close();
-				}
+			ArrayList<Object[]> records1 = new ArrayList<Object[]>();
+			ArrayList<Object[]> records2 = new ArrayList<Object[]>();
+			for (int i = 0; i < BankPreset.PRESET_COUNT; ++i) {
+				records1.add(new Object[]{
+					playerId,
+					i
+				});
 			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+
+			for (PlayerBankPreset playerBankPreset : bankPreset) {
+				records2.add(new Object[]{
+					playerId,
+					playerBankPreset.slot,
+					playerBankPreset.inventory,
+					playerBankPreset.equipment
+				});
+			}
+
+			executeBatchUpdateQuery(getQueries().save_BankPresetRemove, records1.toArray(new Object[][]{}));
+			executeBatchUpdateQuery(getQueries().save_BankPresetAdd, records2.toArray(new Object[][]{}));
 		}
 	}
 
 	@Override
 	protected void querySavePlayerFriends(int playerId, PlayerFriend[] friends) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteFriends, playerId);
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddFriends);
-			for (final PlayerFriend friend : friends) {
-				String username = DataConversions.hashToUsername(friend.playerHash);
-				if (username.equalsIgnoreCase("invalid_name"))
-					continue;
-				statement.setInt(1, playerId);
-				statement.setLong(2, friend.playerHash);
-				statement.setString(3, DataConversions.hashToUsername(friend.playerHash));
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		executeUpdateQuery(getQueries().save_DeleteFriends, playerId);
+
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (final PlayerFriend friend : friends) {
+			String username = DataConversions.hashToUsername(friend.playerHash);
+			if (username.equalsIgnoreCase("invalid_name"))
+				continue;
+
+			records.add(new Object[]{
+				playerId,
+				friend.playerHash,
+				DataConversions.hashToUsername(friend.playerHash)
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().save_AddFriends, records.toArray(new Object[][]{}));
 	}
 
 	@Override
 	protected void querySavePlayerIgnored(int playerId, PlayerIgnore[] ignoreList) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteIgnored, playerId);
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddIgnored);
-			for (final PlayerIgnore ignored : ignoreList) {
-				statement.setInt(1, playerId);
-				statement.setLong(2, ignored.playerHash);
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		executeUpdateQuery(getQueries().save_DeleteIgnored, playerId);
+
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (final PlayerIgnore ignored : ignoreList) {
+			records.add(new Object[]{
+				playerId,
+				ignored.playerHash
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().save_AddIgnored, records.toArray(new Object[][]{}));
 	}
 
 	@Override
 	protected void querySavePlayerQuests(int playerId, PlayerQuest[] quests) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteQuests, playerId);
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddQuest);
-			for (final PlayerQuest quest : quests) {
-				statement.setInt(1, playerId);
-				statement.setInt(2, quest.questId);
-				statement.setInt(3, quest.stage);
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		executeUpdateQuery(getQueries().save_DeleteQuests, playerId);
+
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (final PlayerQuest quest : quests) {
+			records.add(new Object[]{
+				playerId,
+				quest.questId,
+				quest.stage
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().save_AddQuest, records.toArray(new Object[][]{}));
 	}
 
 	@Override
@@ -1624,25 +1566,19 @@ public class MySqlGameDatabase extends GameDatabase {
 
 	@Override
 	protected void querySavePlayerCache(int playerId, PlayerCache[] cache) throws GameDatabaseException {
-		try {
-			executeUpdateQuery(getQueries().save_DeleteCache, playerId);
-			final PreparedStatement statement = getConnection().prepareStatement(getQueries().save_AddCache);
-			for (final PlayerCache cacheKey : cache) {
-				statement.setInt(1, playerId);
-				statement.setInt(2, cacheKey.type);
-				statement.setString(3, cacheKey.key);
-				statement.setString(4, cacheKey.value);
-				statement.addBatch();
-			}
-			try {
-				statement.executeBatch();
-			} finally {
-				statement.close();
-			}
-		} catch (final SQLException ex) {
-			// Convert SQLException to a general usage exception
-			throw new GameDatabaseException(this, ex.getMessage());
+		executeUpdateQuery(getQueries().save_DeleteCache, playerId);
+
+		ArrayList<Object[]> records = new ArrayList<Object[]>();
+		for (final PlayerCache cacheKey : cache) {
+			records.add(new Object[]{
+				playerId,
+				cacheKey.type,
+				cacheKey.key,
+				cacheKey.value
+			});
 		}
+
+		executeBatchUpdateQuery(getQueries().save_AddCache, records.toArray(new Object[][]{}));
 	}
 
 	@Override
@@ -1662,32 +1598,28 @@ public class MySqlGameDatabase extends GameDatabase {
 				statement.close();
 			}
 
-			final PreparedStatement statementUpdate = getConnection().prepareStatement(getQueries().npcKillUpdate);
-			final PreparedStatement statementInsert = getConnection().prepareStatement(getQueries().npcKillInsert);
-
+			ArrayList<Object[]> records1 = new ArrayList<Object[]>();
+			ArrayList<Object[]> records2 = new ArrayList<Object[]>();
 			for (PlayerNpcKills kill : kills) {
 				if (!uniqueIDMap.containsKey(kill.npcId)) {
-					statementInsert.setInt(1, kill.killCount);
-					statementInsert.setInt(2, kill.npcId);
-					statementInsert.setInt(3, playerId);
-					statementInsert.addBatch();
+					records1.add(new Object[]{
+						kill.killCount,
+						kill.npcId,
+						playerId
+					});
 				} else {
-					statementUpdate.setInt(1, kill.killCount);
-					statementUpdate.setInt(2, uniqueIDMap.get(kill.npcId));
-					statementUpdate.setInt(3, kill.npcId);
-					statementUpdate.setInt(4, playerId);
-					statementUpdate.addBatch();
+					records2.add(new Object[]{
+						kill.killCount,
+						uniqueIDMap.get(kill.npcId),
+						kill.npcId,
+						playerId
+					});
 				}
 			}
 
-			try {
-				statementUpdate.executeBatch();
-				statementInsert.executeBatch();
-			} finally {
-				statementUpdate.close();
-				statementInsert.close();
-				result.close();
-			}
+			executeBatchUpdateQuery(getQueries().npcKillInsert, records1.toArray(new Object[][]{}));
+			executeBatchUpdateQuery(getQueries().npcKillUpdate, records2.toArray(new Object[][]{}));
+			result.close();
 		} catch (final SQLException ex) {
 			// Convert SQLException to a general usage exception
 			throw new GameDatabaseException(this, ex.getMessage());
