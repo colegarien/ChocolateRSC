@@ -1,1 +1,1 @@
-inc/ant/bin/ant compile_plugins
+./gradlew.bat plugins:build

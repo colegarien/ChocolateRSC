@@ -4,8 +4,7 @@ echo ""
 echo ""
 echo "Compiling the game server."
 echo ""
-sudo ant compile_core
-sudo ant compile_plugins
+sudo gradlew build
 echo ""
 echo ""
 echo "Done!"
