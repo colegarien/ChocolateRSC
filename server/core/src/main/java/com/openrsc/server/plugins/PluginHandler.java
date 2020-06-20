@@ -98,7 +98,7 @@ public final class PluginHandler {
 
 		// as a last resort search the classpath for the plugins
 		if (!jarExists && System.getProperty("java.class.path").toLowerCase().contains(jarName.toLowerCase())) {
-			Pattern p = Pattern.compile("(;|^)[^;]*plugins\\.jar($|;)", Pattern.CASE_INSENSITIVE);
+			Pattern p = Pattern.compile("(;|^)[^;]*"+jarName.replace(".", "\\.")+"($|;)", Pattern.CASE_INSENSITIVE);
 			Matcher m = p.matcher(System.getProperty("java.class.path"));
 
 			while (m.find()) {
