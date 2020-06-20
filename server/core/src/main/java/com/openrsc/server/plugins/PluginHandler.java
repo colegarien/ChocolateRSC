@@ -25,6 +25,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.logging.log4j.util.Unbox.box;
 
@@ -56,7 +58,7 @@ public final class PluginHandler {
 	}
 
 	public void loadJar() throws Exception {
-		final String pathToJar = "./lib/plugins.jar";
+		final String pathToJar = findJarPath();
 		final boolean jarExists = new File(pathToJar).isFile();
 		if (jarExists) {
 			final JarFile jarFile = new JarFile(pathToJar);
@@ -74,6 +76,42 @@ public final class PluginHandler {
 			}
 			jarFile.close();
 		}
+	}
+
+	private String findJarPath() {
+		// search in standard locations for plugins
+		final String jarName = "plugins.jar";
+		final String[] pathsToJar = new String[]{
+			"./",
+			"./lib/",
+			"./plugins/"
+		};
+		String pathToJar = "";
+		boolean jarExists = false;
+		for (String path : pathsToJar) {
+			pathToJar = path + jarName;
+			if (new File(pathToJar).isFile()) {
+				jarExists = true;
+				break;
+			}
+		}
+
+		// as a last resort search the classpath for the plugins
+		if (!jarExists && System.getProperty("java.class.path").toLowerCase().contains(jarName.toLowerCase())) {
+			Pattern p = Pattern.compile("(;|^)[^;]*plugins\\.jar($|;)", Pattern.CASE_INSENSITIVE);
+			Matcher m = p.matcher(System.getProperty("java.class.path"));
+
+			while (m.find()) {
+				pathToJar = m.group(0).replace(';', ' ').trim();
+				jarExists = new File(pathToJar).isFile();
+
+				if (jarExists) {
+					break;
+				}
+			}
+		}
+
+		return pathToJar;
 	}
 
 	public List<Class<?>> loadClasses(final String pckgname) throws ClassNotFoundException {
