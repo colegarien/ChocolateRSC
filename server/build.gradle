@@ -33,10 +33,6 @@ project(':core') {
         manifest {
             attributes 'Main-Class': 'com.openrsc.server.Server'
         }
-//      TODO do this to make a 'Fat Jar' instead of deploying lib folder
-//        from {
-//            configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-//        }
     }
 }
 
@@ -62,6 +58,9 @@ application {
 
 applicationDistribution.from("conf/") {
     into "conf"
+}
+applicationDistribution.from("avatars/") {
+    into "avatars"
 }
 applicationDistribution.from(fileTree("./").matching { include "*.conf" }) {
     into ""
