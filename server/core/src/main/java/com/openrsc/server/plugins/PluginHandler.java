@@ -56,7 +56,7 @@ public final class PluginHandler {
 	}
 
 	public void loadJar() throws Exception {
-		final String pathToJar = "./plugins.jar";
+		final String pathToJar = "./lib/plugins.jar";
 		final boolean jarExists = new File(pathToJar).isFile();
 		if (jarExists) {
 			final JarFile jarFile = new JarFile(pathToJar);
