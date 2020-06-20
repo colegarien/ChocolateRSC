@@ -1,5 +1,7 @@
 allprojects {
-
+    repositories {
+        mavenCentral()
+    }
 }
 
 subprojects {
@@ -10,24 +12,12 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
-    repositories {
-        mavenCentral()
-    }
-
     compileJava {
         options.compilerArgs += ["-Xlint:deprecation"]
     }
 }
 
 project(':core') {
-    apply plugin: 'application'
-
-    application {
-        executableDir = ''
-        mainClassName = 'com.openrsc.server.Server'
-        applicationDefaultJvmArgs = ['-XX:+UseG1GC', '-XX:MaxGCPauseMillis=100', '-XX:+UseBiasedLocking', '-XX:NewSize=64m']
-    }
-
     dependencies {
         implementation 'org.openlabtesting.netty:netty-all:4.1.48.Final', 'org.apache.logging.log4j:log4j-api:2.8.2',
             'org.apache.logging.log4j:log4j-core:2.8.2', 'org.codelibs:xpp3:1.1.4c.0',
@@ -48,13 +38,6 @@ project(':core') {
 //            configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
 //        }
     }
-
-    applicationDistribution.from("../conf/") {
-        into "conf"
-    }
-    applicationDistribution.from(fileTree("../").matching { include "*.conf" }) {
-        into ""
-    }
 }
 
 project(':plugins') {
@@ -63,4 +46,23 @@ project(':plugins') {
         implementation 'org.apache.logging.log4j:log4j-api:2.8.2', 'org.apache.logging.log4j:log4j-core:2.8.2',
             'com.lmax:disruptor:3.3.11', 'commons-lang:commons-lang:2.6', 'com.google.guava:guava:25.1-jre'
     }
+}
+
+apply plugin: 'application'
+
+dependencies {
+    compile project(':core'), project(':plugins')
+}
+
+application {
+    executableDir = ''
+    mainClassName = 'com.openrsc.server.Server'
+    applicationDefaultJvmArgs = ['-XX:+UseG1GC', '-XX:MaxGCPauseMillis=100', '-XX:+UseBiasedLocking', '-XX:NewSize=64m']
+}
+
+applicationDistribution.from("conf/") {
+    into "conf"
+}
+applicationDistribution.from(fileTree("./").matching { include "*.conf" }) {
+    into ""
 }
