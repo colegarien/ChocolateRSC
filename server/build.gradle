@@ -5,18 +5,13 @@ allprojects {
 subprojects {
     apply plugin: "java"
 
-    buildDir = "$rootProject.projectDir/build"
-
     java {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     repositories {
-        flatDir {
-            name = 'lib directory'
-            dir file("$rootProject.projectDir/lib")
-        }
+        mavenCentral()
     }
 
     compileJava {
@@ -24,43 +19,48 @@ subprojects {
     }
 }
 
-project(':src') {
-    dependencies {
-        implementation ':netty-all:4.1.33.Final', ':netty:3.4.6.final', ':log4j-api:2.8', ':log4j-core:2.8', ':xpp3-1.1.4c',
-            ':xstream:1.4.9', ':mysql-connector-java:5.1.40', ':commons-lang:2.6', ':guava:25.0-jre',
-            ':JDA:4.0.0_55-withDependencies', ':emoji-java:5.1.1', ':json:20190722', ':gitlab4j-api:4.12.17',
-            ':slf4j-nop:1.7.28', ':disruptor:3.3.11'
+project(':core') {
+    apply plugin: 'application'
+
+    application {
+        executableDir = ''
+        mainClassName = 'com.openrsc.server.Server'
+        applicationDefaultJvmArgs = ['-XX:+UseG1GC', '-XX:MaxGCPauseMillis=100', '-XX:+UseBiasedLocking', '-XX:NewSize=64m']
     }
 
-    sourceSets {
-        main {
-            java {
-                srcDirs = ["./"]
-            }
-        }
+    dependencies {
+        implementation 'org.openlabtesting.netty:netty-all:4.1.48.Final', 'org.apache.logging.log4j:log4j-api:2.8.2',
+            'org.apache.logging.log4j:log4j-core:2.8.2', 'org.codelibs:xpp3:1.1.4c.0',
+            'com.thoughtworks.xstream:xstream:1.4.10', 'mysql:mysql-connector-java:5.1.48',
+            'commons-lang:commons-lang:2.6', 'com.google.guava:guava:25.1-jre',
+            'org.apache.commons:commons-collections4:4.4', 'com.vdurmont:emoji-java:5.1.1',
+            'org.json:json:20190722', 'org.gitlab4j:gitlab4j-api:4.12.17',
+            'org.slf4j:slf4j-nop:1.7.28', 'com.lmax:disruptor:3.3.11',
+            files('libs/JDA-4.0.0_55-withDependencies.jar')
     }
 
     jar {
-        baseName 'core'
+        manifest {
+            attributes 'Main-Class': 'com.openrsc.server.Server'
+        }
+//      TODO do this to make a 'Fat Jar' instead of deploying lib folder
+//        from {
+//            configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+//        }
+    }
+
+    applicationDistribution.from("../conf/") {
+        into "conf"
+    }
+    applicationDistribution.from(fileTree("../").matching { include "*.conf" }) {
+        into ""
     }
 }
 
 project(':plugins') {
     dependencies {
-        compile project(':src')
-        implementation ':log4j-api:2.8', ':log4j-core:2.8',
-            ':disruptor:3.3.11', ':commons-lang:2.6', ':guava:25.0-jre'
-    }
-
-    sourceSets {
-        main {
-            java {
-                srcDirs = ["./"]
-            }
-        }
-    }
-
-    jar {
-        baseName 'plugins'
+        compile project(':core')
+        implementation 'org.apache.logging.log4j:log4j-api:2.8.2', 'org.apache.logging.log4j:log4j-core:2.8.2',
+            'com.lmax:disruptor:3.3.11', 'commons-lang:commons-lang:2.6', 'com.google.guava:guava:25.1-jre'
     }
 }

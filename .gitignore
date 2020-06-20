@@ -100,6 +100,8 @@ server/avatars/*.png
 server/*.jar
 server/out/
 server/local.conf
+server/build/
+server/buildplugins/
 
 db/
 
