@@ -17,3 +17,19 @@ jobs:
     - uses: eskatos/gradle-command-action@v1
       with:
         arguments: build
+        
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Client
+        path: Client_Base/build/libs/*.jar
+    
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Client
+        path: PC_Launcher/build/libs/*.jar
+
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Server
+        path: server/build/distributions/*
