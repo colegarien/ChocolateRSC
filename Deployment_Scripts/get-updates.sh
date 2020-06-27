@@ -58,7 +58,7 @@ elif [ "$compiling" == "2" ]; then
 
     cd '../Website/site/public/downloads/' || exit
     find -type f \( -not -name "MD5.SUM" \) -exec md5sum '{}' \; >MD5.SUM # Performs md5 hashing of all files in cache and writes to a text file for the launcher to read
-    cd '../../../../Game' || exit
+    cd '../../../../ChocolateRSC' || exit
 fi
 
 clear
