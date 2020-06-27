@@ -24,6 +24,8 @@ jobs:
     - uses: eskatos/gradle-command-action@v1
       with:
         arguments: Client_Base:build
+
+    - name: Publish Base Client
     - uses: actions/upload-artifact@v2
       with:
         name: Client
@@ -33,6 +35,8 @@ jobs:
     - uses: eskatos/gradle-command-action@v1
       with:
         arguments: PC_Launcher:build
+
+    - name: Publish Client Launcher
     - uses: actions/upload-artifact@v2
       with:
         name: Client

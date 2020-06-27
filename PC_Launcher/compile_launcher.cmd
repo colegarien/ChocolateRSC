@@ -1,1 +1,1 @@
-../server/inc/ant/bin/ant compile
+../gradlew PC_Launcher:build

@@ -20,7 +20,7 @@ echo ""
 echo ""
 gradlew buildServer
 gradlew Client_Base:build
-ant -f PC_Launcher/build.xml compile
+gradlew PC_Launcher:build
 #gradle -b Android_Client/Open\ RSC\ Android\ Client/build.gradle assembleDebug
 
 # Launcher
@@ -45,7 +45,7 @@ elif [ "$compiling" == "2" ]; then
     #yes | sudo cp -f Android_Client/Open\ RSC\ Android\ Client/*.apk ../Website/site/public/downloads/
 
     # Launcher
-    yes | sudo cp -rf PC_Launcher/*.jar ../Website/site/public/downloads/
+    yes | sudo cp -rf PC_Launcher/build/libs/*.jar ../Website/site/public/downloads/
 
     # Set file permissions within the Website downloads folder
     sudo chmod +x ../Website/site/public/downloads/*.jar
