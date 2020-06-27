@@ -9,7 +9,7 @@ run-server:
 	`pwd`/Deployment_Scripts/run.sh
 
 run-client:
-	gradlew Client_Base:run
+	./gradlew Client_Base:run
 
 combined-install:
 	`pwd`/Deployment_Scripts/combined-install.sh ${SSH_PORT}

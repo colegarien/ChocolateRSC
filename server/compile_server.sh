@@ -4,7 +4,7 @@ echo ""
 echo ""
 echo "Compiling the game server."
 echo ""
-sudo gradlew build
+sudo ./gradlew build
 echo ""
 echo ""
 echo "Done!"

@@ -1,1 +1,1 @@
-gradlew Client_Base:build
+../gradlew Client_Base:build

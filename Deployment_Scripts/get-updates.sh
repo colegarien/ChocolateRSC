@@ -18,9 +18,9 @@ echo ""
 echo "Compiling all code now."
 echo ""
 echo ""
-gradlew buildServer
-gradlew Client_Base:build
-gradlew PC_Launcher:build
+./gradlew buildServer
+./gradlew Client_Base:build
+./gradlew PC_Launcher:build
 #gradle -b Android_Client/Open\ RSC\ Android\ Client/build.gradle assembleDebug
 
 # Launcher
