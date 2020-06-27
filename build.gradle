@@ -1,3 +1,7 @@
+task build {
+    dependsOn 'buildServer', 'Client_Base:build', 'PC_Launcher:build'
+}
+
 task runServer {
     group 'server'
     dependsOn gradle.includedBuild('server').task(':run')
