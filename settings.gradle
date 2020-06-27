@@ -1,0 +1,3 @@
+include ':Client_Base'
+includeBuild('server')
+rootProject.name = "ChocolateRSC"

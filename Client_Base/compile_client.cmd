@@ -1,1 +1,1 @@
-../server/inc/ant/bin/ant compile
+gradlew Client_Base:build

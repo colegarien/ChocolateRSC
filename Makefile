@@ -9,7 +9,7 @@ run-server:
 	`pwd`/Deployment_Scripts/run.sh
 
 run-client:
-	ant -f Client_Base/build.xml runclient
+	gradlew Client_Base:run
 
 combined-install:
 	`pwd`/Deployment_Scripts/combined-install.sh ${SSH_PORT}
