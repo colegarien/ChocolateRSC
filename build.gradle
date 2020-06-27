@@ -1,0 +1,107 @@
+task build {
+    dependsOn 'buildServer', 'Client_Base:build', 'PC_Launcher:build'
+}
+
+task runServer {
+    group 'server'
+    dependsOn gradle.includedBuild('server').task(':run')
+}
+
+task buildServer {
+    group 'server'
+    dependsOn gradle.includedBuild('server').task(':build')
+}
+
+project(':Client_Base') {
+    apply plugin: "java"
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    compileJava {
+        options.compilerArgs += ["-Xlint:unchecked", "-Xlint:deprecation"]
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDirs = ['src', '../PC_Client/src']
+            }
+        }
+    }
+
+    jar {
+        archiveName 'Open_RSC_Client.jar'
+
+        manifest {
+            attributes 'Main-Class': 'orsc.OpenRSC'
+        }
+
+        into 'res', {
+            from 'src/res'
+        }
+    }
+
+    task run(dependsOn: jar, type: JavaExec) {
+        group = 'pc_client'
+
+        jvmArgs = ['-Xms312m', '-Dsun.java2d.opengl=true']
+        main = '-jar'; args 'build/libs/Open_RSC_Client.jar'
+    }
+
+    build {
+        group = 'pc_client'
+    }
+
+}
+
+project(':PC_Launcher') {
+    apply plugin: "java"
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        compile 'org.jsoup:jsoup:1.11.3'
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    compileJava {
+        options.compilerArgs += ["-Xlint:deprecation"]
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDirs = ['src']
+            }
+        }
+    }
+
+    jar {
+        archiveName 'OpenRSC.jar'
+
+        manifest {
+            attributes 'Main-Class': 'com.loader.openrsc.Launcher'
+        }
+
+        from {
+            configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+        }
+
+        into 'data', {
+            from 'src/data'
+        }
+    }
+
+    build {
+        group = 'pc_launcher'
+    }
+}

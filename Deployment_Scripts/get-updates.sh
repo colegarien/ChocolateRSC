@@ -18,10 +18,9 @@ echo ""
 echo "Compiling all code now."
 echo ""
 echo ""
-ant -f server/build.xml compile_core
-ant -f server/build.xml compile_plugins
-ant -f Client_Base/build.xml compile
-ant -f PC_Launcher/build.xml compile
+gradlew buildServer
+gradlew Client_Base:build
+gradlew PC_Launcher:build
 #gradle -b Android_Client/Open\ RSC\ Android\ Client/build.gradle assembleDebug
 
 # Launcher
@@ -40,13 +39,13 @@ if [ "$compiling" == "1" ]; then
     echo ""
 elif [ "$compiling" == "2" ]; then
     # PC Client
-    yes | sudo cp -f Client_Base/*.jar ../Website/site/public/downloads/
+    yes | sudo cp -f Client_Base/build/libs/*.jar ../Website/site/public/downloads/
 
     # Android client
     #yes | sudo cp -f Android_Client/Open\ RSC\ Android\ Client/*.apk ../Website/site/public/downloads/
 
     # Launcher
-    yes | sudo cp -rf PC_Launcher/*.jar ../Website/site/public/downloads/
+    yes | sudo cp -rf PC_Launcher/build/libs/*.jar ../Website/site/public/downloads/
 
     # Set file permissions within the Website downloads folder
     sudo chmod +x ../Website/site/public/downloads/*.jar

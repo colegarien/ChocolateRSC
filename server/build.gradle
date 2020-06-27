@@ -1,0 +1,71 @@
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: "java"
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    compileJava {
+        options.compilerArgs += ["-Xlint:deprecation"]
+    }
+}
+
+project(':core') {
+    dependencies {
+        implementation 'org.openlabtesting.netty:netty-all:4.1.48.Final', 'org.apache.logging.log4j:log4j-api:2.8.2',
+            'org.apache.logging.log4j:log4j-core:2.8.2', 'org.codelibs:xpp3:1.1.4c.0',
+            'com.thoughtworks.xstream:xstream:1.4.12', 'mysql:mysql-connector-java:5.1.48',
+            'commons-lang:commons-lang:2.6', 'com.google.guava:guava:25.1-jre',
+            'org.apache.commons:commons-collections4:4.4', 'com.vdurmont:emoji-java:5.1.1',
+            'org.json:json:20190722', 'org.gitlab4j:gitlab4j-api:4.12.17',
+            'org.slf4j:slf4j-nop:1.7.28', 'com.lmax:disruptor:3.3.11',
+            files('libs/JDA-4.0.0_55-withDependencies.jar')
+    }
+
+    jar {
+        manifest {
+            attributes 'Main-Class': 'com.openrsc.server.Server'
+        }
+    }
+}
+
+project(':plugins') {
+    dependencies {
+        compile project(':core')
+        implementation 'org.apache.logging.log4j:log4j-api:2.8.2', 'org.apache.logging.log4j:log4j-core:2.8.2',
+            'com.lmax:disruptor:3.3.11', 'commons-lang:commons-lang:2.6', 'com.google.guava:guava:25.1-jre'
+    }
+}
+
+apply plugin: 'application'
+
+dependencies {
+    compile project(':core'), project(':plugins')
+}
+
+application {
+    executableDir = ''
+    mainClassName = 'com.openrsc.server.Server'
+    applicationDefaultJvmArgs = ['-XX:+UseG1GC', '-XX:MaxGCPauseMillis=100', '-XX:+UseBiasedLocking', '-XX:NewSize=64m']
+}
+
+applicationDistribution.from("conf/") {
+    into "conf"
+}
+applicationDistribution.from("avatars/") {
+    into "avatars"
+}
+applicationDistribution.from(fileTree("./").matching { include "*.conf" }) {
+    into ""
+}
+
+run {
+    args = ['default.conf']
+}

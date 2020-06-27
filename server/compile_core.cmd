@@ -1,1 +1,1 @@
-inc/ant/bin/ant compile_core
+./gradlew.bat core:build

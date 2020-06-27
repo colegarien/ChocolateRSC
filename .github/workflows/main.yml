@@ -14,22 +14,6 @@ jobs:
       with:
         java-version: '13' # The OpenJDK version to make available on the path
         architecture: 'x64' # defaults to 'x64'
-    
-    - name: Build Core
-      run: ant -f server/build.xml compile_core
-    - name: Build Plugins
-      run: ant -f server/build.xml compile_plugins
-        
-    - name: Build Base Client
-      run: ant -f Client_Base/build.xml compile
-    - uses: actions/upload-artifact@v2
+    - uses: eskatos/gradle-command-action@v1
       with:
-        name: Client
-        path: Client_Base/*.jar
-        
-    - name: Build Client Launcher
-      run: ant -f PC_Launcher/build.xml compile
-    - uses: actions/upload-artifact@v2
-      with:
-        name: Client
-        path: PC_Launcher/*.jar
+        arguments: build

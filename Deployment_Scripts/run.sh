@@ -9,4 +9,4 @@ echo "Use CTRL + A + D to detach the live server screen so it runs in the backgr
 echo ""
 echo ""
 cd server
-screen -dmS name ./ant_launcher.sh
+screen -dmS name ./launcher.sh
