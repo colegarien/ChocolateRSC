@@ -46,6 +46,7 @@ jobs:
           java-version: 1.8
       - name: Build debug APK
         run: bash "./Android_Client/Open RSC Android Client/gradlew" assembleDebug --stacktrace
+        working-directory: "./Android_Client/Open RSC Android Client"
       - name: Upload APK
         uses: actions/upload-artifact@v1
         with:
