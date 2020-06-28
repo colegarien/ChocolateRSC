@@ -33,22 +33,22 @@ public class ButtonListener implements ActionListener {
 			}
 
 			case "openrsc": {
-				String ip = "game.openrsc.com";
-				String port = "43596";
+				String ip = "ozzyria.greybuntu.net";
+				String port = "43594";
 				set(ip, port);
 				launch();
 				return;
 			}
 			case "cabbage": {
-				String ip = "game.openrsc.com";
-				String port = "43595";
+				String ip = "ozzyria.greybuntu.net";
+				String port = "43594";
 				set(ip, port);
 				launch();
 				return;
 			}
 
 			case "preservation": {
-				String ip = "game.openrsc.com";
+				String ip = "ozzyria.greybuntu.net";
 				String port = "43594";
 				set(ip, port);
 				launch();
@@ -56,16 +56,16 @@ public class ButtonListener implements ActionListener {
 			}
 
 			case "wk": {
-				String ip = "game.openrsc.com";
-				String port = "43598";
+				String ip = "ozzyria.greybuntu.net";
+				String port = "43594";
 				set(ip, port);
 				launch();
 				return;
 			}
 
 			case "dev": {
-				String ip = "orsc.dev";
-				String port = "43599";
+				String ip = "ozzyria.greybuntu.net";
+				String port = "43594";
 				set(ip, port);
 				launch();
 				return;
