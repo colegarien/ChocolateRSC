@@ -3,7 +3,6 @@
 RED=$(tput setaf 1)
 NC=$(tput sgr0) # No Color
 
-exec 0</dev/tty
 source .env
 
 clear
