@@ -160,7 +160,7 @@ public class CacheUpdater extends Activity {
             builder.setTitle("Game Selection");
 
             // add a list
-            String[] games = {"Chocolate-RSC", "Local Instance"};
+            String[] games = {"Chocolate RSC", "Local Instance"};
             builder.setItems(games, (dialog, which) -> {
                 switch (which) {
                     case 0: // RSC Cabbage
