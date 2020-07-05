@@ -30,6 +30,8 @@ import java.net.URL;
 
 import orsc.osConfig;
 
+import static android.support.v4.content.FileProvider.getUriForFile;
+
 public class ApplicationUpdater extends Activity {
 
     private TextProgressBar progressBar;
@@ -82,7 +84,7 @@ public class ApplicationUpdater extends Activity {
                         + " please go ahead and install it.")
                 .setCancelable(false).setPositiveButton("Install", (dialog, id) -> {
 					try {
-						if(Build.VERSION.SDK_INT>=24){
+						if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
 							try{
 								Method m = StrictMode.class.getMethod("disableDeathOnFileUriExposure");
 								m.invoke(null);
@@ -96,7 +98,10 @@ public class ApplicationUpdater extends Activity {
 						File downloadedFile = new File(getFilesDir() + File.separator + "openrsc.apk");
 						downloadedFile.setReadable(true, false);
 
-						Uri fileLoc = Uri.fromFile(downloadedFile);
+						Uri fileLoc = getUriForFile(getBaseContext(), getApplicationContext().getPackageName() + ".fileprovider", downloadedFile);
+						getBaseContext().grantUriPermission(getApplicationContext().getPackageName(), fileLoc, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+						//Uri fileLoc = Uri.fromFile(downloadedFile);
 						Intent intent = new Intent(Intent.ACTION_VIEW);
 						intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 						intent.setDataAndType(fileLoc, "application/vnd.android.package-archive");

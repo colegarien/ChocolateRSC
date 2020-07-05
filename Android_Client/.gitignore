@@ -31,3 +31,4 @@ proguard/
 
 # Android Studio captures folder
 captures/
+/Open RSC Android Client/release/output.json
