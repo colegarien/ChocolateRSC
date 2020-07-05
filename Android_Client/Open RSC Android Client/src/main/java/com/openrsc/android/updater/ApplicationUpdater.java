@@ -105,6 +105,7 @@ public class ApplicationUpdater extends Activity {
 						Intent intent = new Intent(Intent.ACTION_VIEW);
 						intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 						intent.setDataAndType(fileLoc, "application/vnd.android.package-archive");
+						intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 						startActivity(intent);
 						finish();
 					} catch (Exception e) {
