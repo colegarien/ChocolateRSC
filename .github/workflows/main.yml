@@ -37,8 +37,6 @@ jobs:
   apk:
     name: Generate APK
     runs-on: ubuntu-18.04
-    env:
-      SIGNED_RELEASE_FILE: "Android_Client/Open RSC Android Client/build/outputs/apk/release/openrsc.apk"
 
     steps:
       - uses: actions/checkout@v1
@@ -60,4 +58,4 @@ jobs:
         uses: actions/upload-artifact@v1
         with:
           name: app
-          path: $SIGNED_RELEASE_FILE
+          path: "Android_Client/Open RSC Android Client/build/outputs/apk/release/openrsc-signed.apk"
